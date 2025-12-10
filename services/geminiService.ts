@@ -13,11 +13,11 @@ const getApiKey = (): string => {
   return key;
 };
 
-// Helper untuk retry otomatis jika model sibuk (503)
+// Helper untuk retry otomatis jika model sibuk (503) atau Rate Limit (429)
 const retryWithBackoff = async <T>(
   operation: () => Promise<T>,
-  retries: number = 3,
-  initialDelay: number = 2000
+  retries: number = 5,
+  initialDelay: number = 3000
 ): Promise<T> => {
   let lastError: any;
   
@@ -27,17 +27,40 @@ const retryWithBackoff = async <T>(
     } catch (error: any) {
       lastError = error;
       
-      // Deteksi error 503 (Overloaded) atau 429 (Rate Limit)
+      // Analisis Error: Apakah 503 (Overloaded) atau 429 (Quota/Rate Limit)
+      const isRateLimit = 
+        error.status === 429 || 
+        error.code === 429 || 
+        error.status === "RESOURCE_EXHAUSTED" ||
+        (error.message && error.message.toLowerCase().includes('quota')) ||
+        (error.message && error.message.toLowerCase().includes('rate limit'));
+
       const isOverloaded = 
         error.status === 503 || 
         error.code === 503 ||
         (error.message && error.message.toLowerCase().includes('overloaded')) ||
         (error.message && error.message.toLowerCase().includes('unavailable'));
 
-      if (isOverloaded && i < retries - 1) {
-        const delay = initialDelay * Math.pow(2, i); // 2s, 4s, 8s...
-        console.warn(`Gemini Model Overloaded. Retrying in ${delay}ms... (Attempt ${i + 1}/${retries})`);
-        await new Promise(resolve => setTimeout(resolve, delay));
+      // Jika error bisa di-retry dan sisa kesempatan masih ada
+      if ((isRateLimit || isOverloaded) && i < retries - 1) {
+        let waitTime = initialDelay * Math.pow(2, i); // Default: 3s, 6s, 12s...
+        
+        // Tambahkan Jitter (waktu acak) agar tidak bentrok
+        waitTime += Math.random() * 1000;
+
+        // SMART RETRY: Coba baca "Please retry in X seconds" dari pesan error Google
+        if (error.message) {
+            const match = error.message.match(/retry in (\d+(\.\d+)?)s/);
+            if (match && match[1]) {
+                const serverRequestedWait = parseFloat(match[1]) * 1000;
+                // Gunakan waktu dari server + buffer 1 detik agar aman
+                waitTime = Math.max(waitTime, serverRequestedWait + 1000);
+            }
+        }
+
+        console.warn(`Gemini API Busy/Rate Limited (Status ${error.status || error.code}). Waiting ${Math.round(waitTime/1000)}s... (Attempt ${i + 1}/${retries})`);
+        
+        await new Promise(resolve => setTimeout(resolve, waitTime));
         continue;
       }
       
