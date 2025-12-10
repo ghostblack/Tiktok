@@ -1,37 +1,14 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { GeneratedCampaign, CampaignConfig } from "../types";
 
-// Helper untuk mengambil API Key dengan aman
-const getApiKey = (): string => {
-  try {
-    // @ts-ignore - Mencegah error typescript jika types belum update
-    const key = import.meta.env.VITE_API_KEY;
-    if (!key) {
-      console.warn("VITE_API_KEY tidak ditemukan di environment variables.");
-      return "";
-    }
-    return key;
-  } catch (error) {
-    console.error("Gagal membaca environment variable:", error);
-    return "";
-  }
-};
-
-// Kita tidak menginisialisasi client secara global untuk mencegah crash saat load awal
-// Client akan dibuat saat fungsi dipanggil
-
 export const generateAffiliatePrompts = async (
   imageBase64: string,
   mimeType: string,
   config: CampaignConfig
 ): Promise<GeneratedCampaign> => {
-  const apiKey = getApiKey();
-  
-  if (!apiKey) {
-    throw new Error("API Key belum disetting. Silakan cek pengaturan Environment Variables di Netlify (VITE_API_KEY).");
-  }
-
-  const ai = new GoogleGenAI({ apiKey: apiKey });
+  // Initialize GoogleGenAI with process.env.API_KEY as per guidelines.
+  // Assumes process.env.API_KEY is available and valid.
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   const modelId = "gemini-2.5-flash"; // Excellent for multimodal analysis
 
   // Define instruction parts based on user selection
@@ -167,12 +144,8 @@ export const generateAffiliatePrompts = async (
 };
 
 export const generateImageFromPrompt = async (prompt: string, referenceImageBase64?: string): Promise<string> => {
-  const apiKey = getApiKey();
-  if (!apiKey) {
-    throw new Error("API Key belum disetting.");
-  }
-  
-  const ai = new GoogleGenAI({ apiKey: apiKey });
+  // Initialize GoogleGenAI with process.env.API_KEY as per guidelines.
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   const modelId = "gemini-2.5-flash-image";
 
   // Prepare contents. If reference image exists, add it to guide the generation (Image-to-Image)
