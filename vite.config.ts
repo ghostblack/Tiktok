@@ -3,8 +3,7 @@ import react from '@vitejs/plugin-react'
 
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => {
-  // Fix: Use '.' instead of process.cwd() as 'cwd' might not be available in the type definition of Process in this context
-  const env = loadEnv(mode, '.', '');
+  const env = loadEnv(mode, process.cwd(), '');
   
   return {
     plugins: [react()],
@@ -16,7 +15,7 @@ export default defineConfig(({ mode }) => {
     define: {
       // Safely expose API_KEY. 
       // Note: On Netlify, make sure to add API_KEY in Site Settings > Environment Variables
-      'process.env.API_KEY': JSON.stringify(env.API_KEY || process.env.API_KEY || '')
+      'process.env.API_KEY': JSON.stringify(env.API_KEY || '')
     }
   }
 })
