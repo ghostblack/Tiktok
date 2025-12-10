@@ -1,15 +1,60 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { GeneratedCampaign, CampaignConfig } from "../types";
 
+// Helper untuk mengambil API Key dengan aman
+const getApiKey = (): string => {
+  // Cek urutan: VITE_API_KEY (Netlify) -> API_KEY (Universal/IDX) -> GOOGLE_API_KEY
+  // Menggunakan process.env karena sudah di-polyfill di vite.config.ts
+  const key = process.env.VITE_API_KEY || process.env.API_KEY || process.env.GOOGLE_API_KEY;
+  
+  if (!key) {
+    throw new Error("API Key tidak ditemukan. Pastikan VITE_API_KEY disetting di Netlify atau API_KEY di environment lokal.");
+  }
+  return key;
+};
+
+// Helper untuk retry otomatis jika model sibuk (503)
+const retryWithBackoff = async <T>(
+  operation: () => Promise<T>,
+  retries: number = 3,
+  initialDelay: number = 2000
+): Promise<T> => {
+  let lastError: any;
+  
+  for (let i = 0; i < retries; i++) {
+    try {
+      return await operation();
+    } catch (error: any) {
+      lastError = error;
+      
+      // Deteksi error 503 (Overloaded) atau 429 (Rate Limit)
+      const isOverloaded = 
+        error.status === 503 || 
+        error.code === 503 ||
+        (error.message && error.message.toLowerCase().includes('overloaded')) ||
+        (error.message && error.message.toLowerCase().includes('unavailable'));
+
+      if (isOverloaded && i < retries - 1) {
+        const delay = initialDelay * Math.pow(2, i); // 2s, 4s, 8s...
+        console.warn(`Gemini Model Overloaded. Retrying in ${delay}ms... (Attempt ${i + 1}/${retries})`);
+        await new Promise(resolve => setTimeout(resolve, delay));
+        continue;
+      }
+      
+      throw error;
+    }
+  }
+  throw lastError;
+};
+
 export const generateAffiliatePrompts = async (
   imageBase64: string,
   mimeType: string,
   config: CampaignConfig
 ): Promise<GeneratedCampaign> => {
-  // Initialize GoogleGenAI with process.env.API_KEY as per guidelines.
-  // Assumes process.env.API_KEY is available and valid.
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-  const modelId = "gemini-2.5-flash"; // Excellent for multimodal analysis
+  const apiKey = getApiKey();
+  const ai = new GoogleGenAI({ apiKey });
+  const modelId = "gemini-2.5-flash"; 
 
   // Define instruction parts based on user selection
   let modelInstruction = "";
@@ -91,7 +136,8 @@ export const generateAffiliatePrompts = async (
     Pastikan deskripsi Subject dan Product identik (copy-paste) di ketiga prompt.
   `;
 
-  const response = await ai.models.generateContent({
+  // Wrap API call with retry mechanism
+  const response = await retryWithBackoff(() => ai.models.generateContent({
     model: modelId,
     config: {
       systemInstruction: systemInstruction,
@@ -134,7 +180,7 @@ export const generateAffiliatePrompts = async (
         }
       ]
     }
-  });
+  }));
 
   if (!response.text) {
     throw new Error("Gagal mendapatkan respons dari Gemini.");
@@ -144,22 +190,19 @@ export const generateAffiliatePrompts = async (
 };
 
 export const generateImageFromPrompt = async (prompt: string, referenceImageBase64?: string): Promise<string> => {
-  // Initialize GoogleGenAI with process.env.API_KEY as per guidelines.
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  const apiKey = getApiKey();
+  const ai = new GoogleGenAI({ apiKey });
   const modelId = "gemini-2.5-flash-image";
 
-  // Prepare contents. If reference image exists, add it to guide the generation (Image-to-Image)
   const parts: any[] = [];
 
   if (referenceImageBase64) {
-    // Adding the reference image helps the model maintain product consistency
     parts.push({
       inlineData: {
-        mimeType: "image/jpeg", // Assuming generic image type, API handles most
+        mimeType: "image/jpeg",
         data: referenceImageBase64
       }
     });
-    // Add instruction to use the image as reference
     parts.push({
       text: "Generate a high-quality image based on the following prompt. IMPORTANT: The product in the generated image must look EXACTLY like the product in the provided reference image. Do not change the color, logo, or shape of the product. \n\nPrompt: " + prompt
     });
@@ -167,19 +210,19 @@ export const generateImageFromPrompt = async (prompt: string, referenceImageBase
     parts.push({ text: prompt });
   }
 
-  const response = await ai.models.generateContent({
+  // Wrap API call with retry mechanism
+  const response = await retryWithBackoff(() => ai.models.generateContent({
     model: modelId,
     contents: {
       parts: parts
     },
     config: {
       imageConfig: {
-        aspectRatio: "9:16", // Vertical for TikTok/Shorts/Reels
+        aspectRatio: "9:16", 
       }
     }
-  });
+  }));
 
-  // Extract image from response parts
   if (response.candidates?.[0]?.content?.parts) {
     for (const part of response.candidates[0].content.parts) {
       if (part.inlineData && part.inlineData.data) {
