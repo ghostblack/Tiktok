@@ -1,6 +1,5 @@
-
 import React, { useState } from 'react';
-import { ScenePrompt } from '../types';
+import { ScenePrompt, ImageQuality } from '../types';
 import { CopyButton } from './CopyButton';
 import { ImageIcon, VideoIcon, DownloadIcon, RefreshIcon, TextIcon } from './Icon';
 import { generateImageFromPrompt } from '../services/geminiService';
@@ -9,9 +8,15 @@ interface SceneCardProps {
   scene: ScenePrompt;
   index: number;
   uploadedImageBase64?: string;
+  imageQuality?: ImageQuality;
 }
 
-export const SceneCard: React.FC<SceneCardProps> = ({ scene, index, uploadedImageBase64 }) => {
+export const SceneCard: React.FC<SceneCardProps> = ({ 
+    scene, 
+    index, 
+    uploadedImageBase64, 
+    imageQuality = 'standard' 
+}) => {
   const [isGenerating, setIsGenerating] = useState(false);
   const [generatedImage, setGeneratedImage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -20,8 +25,12 @@ export const SceneCard: React.FC<SceneCardProps> = ({ scene, index, uploadedImag
     setIsGenerating(true);
     setError(null);
     try {
-      // Pass the uploaded image as a reference if available
-      const base64Img = await generateImageFromPrompt(scene.image_prompt, uploadedImageBase64);
+      // Pass the uploaded image as a reference if available, AND the quality setting
+      const base64Img = await generateImageFromPrompt(
+          scene.image_prompt, 
+          uploadedImageBase64,
+          imageQuality as ImageQuality
+      );
       setGeneratedImage(base64Img);
     } catch (err: any) {
       setError(err.message || "Gagal generate gambar");
@@ -74,7 +83,7 @@ export const SceneCard: React.FC<SceneCardProps> = ({ scene, index, uploadedImag
           <div className="p-4 border-b border-slate-700/50 flex items-center justify-between">
             <div className="flex items-center gap-2 text-blue-400 text-sm font-semibold">
               <ImageIcon />
-              <span>Visual Scene (Single Shot)</span>
+              <span>Visual Scene ({imageQuality === 'premium' ? 'Pro 3.0' : 'Std Flash'})</span>
             </div>
             {generatedImage && (
               <button
@@ -120,7 +129,9 @@ export const SceneCard: React.FC<SceneCardProps> = ({ scene, index, uploadedImag
                   className={`px-6 py-2 rounded-lg font-medium text-sm transition-all flex items-center justify-center gap-2 mx-auto w-full ${
                     isGenerating 
                       ? 'bg-slate-700 text-slate-400 cursor-wait' 
-                      : 'bg-gradient-to-r from-blue-600 to-purple-600 text-white hover:shadow-lg hover:shadow-blue-900/20'
+                      : imageQuality === 'premium'
+                        ? 'bg-gradient-to-r from-purple-600 to-pink-600 text-white hover:shadow-lg hover:shadow-purple-900/20'
+                        : 'bg-gradient-to-r from-blue-600 to-cyan-600 text-white hover:shadow-lg hover:shadow-blue-900/20'
                   }`}
                 >
                   {isGenerating ? (
@@ -129,12 +140,12 @@ export const SceneCard: React.FC<SceneCardProps> = ({ scene, index, uploadedImag
                         <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                         <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                       </svg>
-                      Membuat Gambar...
+                      Membuat ({imageQuality === 'premium' ? 'HQ' : 'Std'})...
                     </>
                   ) : (
                     <>
                       <span className="text-lg">✨</span>
-                      Generate Gambar
+                      Generate Gambar ({imageQuality === 'premium' ? 'Pro' : 'Std'})
                     </>
                   )}
                 </button>

@@ -21,9 +21,11 @@ export enum ProcessStatus {
 
 export type ModelType = 'indo_man' | 'indo_woman' | 'no_model';
 export type StyleType = 'cinematic' | 'natural';
+export type ImageQuality = 'standard' | 'premium';
 
 export interface CampaignConfig {
   modelType: ModelType;
   styleType: StyleType;
-  productName: string; // User input for better context
+  productName: string;
+  imageQuality: ImageQuality;
 }
