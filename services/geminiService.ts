@@ -78,94 +78,95 @@ export const generateManualPromptText = (config: CampaignConfig): string => {
   // 1. TENTUKAN LIGHTING KEYWORDS YANG KONSISTEN
   let lightingConsistency = "";
   if (config.styleType === 'cinematic') {
-    lightingConsistency = "bright soft diffused studio lighting, neutral minimalist background, realistic product colors, 8k resolution, commercial videography";
+    lightingConsistency = "commercial fashion lighting, soft diffused studio light, bright neutral atmosphere, 8k resolution";
   } else {
     lightingConsistency = "natural soft window light, bright and airy, consistent daylight temperature, soft shadows, realistic colors";
   }
 
   // 2. TENTUKAN BACKGROUND PROPS BERDASARKAN GENDER
-  let rackDescription = "";
+  let rackContent = ""; // Isi raknya apa
   let modelInstruction = "";
   
   if (config.modelType === 'indo_man') {
-    rackDescription = "clothing rack hanging MEN'S minimalist jackets and shirts in background";
+    rackContent = "hanging MEN'S minimalist jackets and shirts";
     modelInstruction = `
       MODEL UTAMA: Pria Indonesia (Indonesian Man).
       ATURAN KONSISTENSI:
       1. Wajah: "Short fade haircut, brown skin, friendly face".
       2. PENTING: Model SEDANG MEMAKAI PRODUK tersebut.
-      3. Background: Ada rak baju isinya pakaian cowok (jaket/kemeja).
     `;
   } else if (config.modelType === 'indo_woman') {
-    rackDescription = "clothing rack hanging WOMEN'S aesthetic blouses and dresses in background";
+    rackContent = "hanging WOMEN'S aesthetic blouses and dresses";
     modelInstruction = `
       MODEL UTAMA: Wanita Indonesia (Indonesian Woman).
       ATURAN KONSISTENSI:
       1. Wajah: "Long straight black hair, soft natural makeup, indonesian features".
       2. PENTING: Model SEDANG MEMAKAI PRODUK tersebut.
-      3. Background: Ada rak baju isinya pakaian cewek (dress/blouse).
     `;
   } else if (config.modelType === 'indo_hijab') {
-    rackDescription = "clothing rack hanging modest muslim fashion, tunics, and robes in background";
+    rackContent = "hanging modest muslim fashion, tunics, and robes";
     modelInstruction = `
       MODEL UTAMA: Wanita Indonesia Berhijab (Indonesian Hijabi Woman).
       ATURAN KONSISTENSI:
       1. Wajah: "Wearing elegant modern hijab (matching product color), soft natural makeup, indonesian features".
       2. PENTING: Model SEDANG MEMAKAI PRODUK tersebut dengan gaya sopan/muslimah.
-      3. Background: Ada rak baju isinya busana muslim modern.
     `;
   } else {
-    rackDescription = "clothing rack with minimalist aesthetic outfits in background";
+    rackContent = "minimalist aesthetic outfits";
     modelInstruction = `
       MODEL UTAMA: TIDAK ADA MANUSIA (Product Only).
       Fokus pada produk di hanger atau manekin.
     `;
   }
 
+  // 3. TENTUKAN "FIXED SET DESIGN" UNTUK KONSISTENSI BACKGROUND
+  let fixedBackground = ""; // Ini variabel kunci untuk konsistensi
   let styleInstruction = "";
   let structureInstruction = "";
 
   if (config.styleType === 'cinematic') {
+    // DESKRIPSI BACKGROUND YANG SANGAT SPESIFIK DAN KAKU UNTUK KONSISTENSI
+    fixedBackground = `luxury minimalist studio, pure white cyclorama wall, warm beige concrete floor, large arched standing mirror on left, dried pampas grass in ceramic vase on right, clothing rack with ${rackContent} in background center`;
+    
     styleInstruction = `
       GAYA VISUAL: AESTHETIC FASHION STUDIO (HIGH END). 
-      Background: Ruangan studio minimalis dinding putih bersih, ada cermin lengkung (arched mirror), tanaman pampas, dan ${rackDescription}.
+      Background Wajib (Harus sama persis di semua scene): ${fixedBackground}.
       Fokus Utama: PRODUK HARUS SAMA PERSIS WARNANYA DENGAN GAMBAR ASLI.
     `;
     structureInstruction = `
       STRUKTUR SCENE (VIRAL STUDIO FORMULA):
-      1. Scene 1 (THE HOOK - Dynamic Entrance): LOW ANGLE / DYNAMIC SHOT.
-         - Visual: Model berjalan masuk ke dalam frame (walking into frame) dengan percaya diri atau melakukan pose transisi cepat. Terlihat 'mahal'.
-         - Gerakan: Walking confident, hair flip (if woman), or adjusting collar sharp (if man).
-         - Teks Layar: Hook yang bikin stop scroll (Contoh: "Definisi Mewah 😭" atau "Outfit Hack!").
+      1. Scene 1 (THE HOOK - Dynamic Entrance): LOW ANGLE.
+         - Visual: Model berjalan masuk ke dalam frame (walking into frame).
+         - Teks Layar (PILIH SATU secara acak): "Jangan Skip! 🛑", "Nemuin Hidden Gem 💎", "Definisi Mewah ✨", "Outfit Sultan 👑", "Racun Fashion 😭"
       
       2. Scene 2 (THE PROOF - Detail & Touch): EXTREME CLOSE UP.
-         - Visual: Tangan model menyentuh/mengelus kain baju untuk menunjukkan kelembutan (softness) dan detail jahitan.
-         - Gerakan: Hand brushing fabric, slow motion.
-         - Teks Layar: Validasi kualitas (Contoh: "Bahannya Premium Parah").
+         - Visual: Tangan model menyentuh kain baju. Background agak blur tapi terlihat elemen studio yang sama.
+         - Teks Layar (PILIH SATU secara acak): "Bahannya Adem Pol", "Kualitas Butik", "Tekstur Premium", "Gak Nerawang", "Jahitan Rapi BGT"
 
       3. Scene 3 (THE CLOSE - Confident & CTA): MEDIUM SHOT.
-         - Visual: Model melihat ke cermin (atau ke kamera), tersenyum puas, lalu menunjuk ke bawah/keranjang.
-         - Gerakan: Checking reflection, smiling, pointing gesture.
-         - Teks Layar: Urgency (Contoh: "Stok Dikit, Amankan!").
+         - Visual: Model melihat ke cermin/kamera, tersenyum, menunjuk ke bawah.
+         - Teks Layar (PILIH SATU secara acak): "Stok Dikit, Amankan!", "Cek Keranjang Kuning", "Diskon Hari Ini 👇", "Wajib Punya Fix"
     `;
   } else if (config.styleType === 'unboxing') {
-    styleInstruction = `GAYA VISUAL: UNBOXING POV. Background: Meja estetik. Lighting: ${lightingConsistency}.`;
+    fixedBackground = "aesthetic white table, beige wall, soft sunlight from window on right";
+    styleInstruction = `GAYA VISUAL: UNBOXING POV. Background: ${fixedBackground}. Lighting: ${lightingConsistency}.`;
     structureInstruction = `
       STRUKTUR SCENE (UNBOXING):
-      1. Scene 1: Buka paket dengan cutter ASMR (Teks: "Unboxing Time!").
-      2. Scene 2: Reveal produk dari plastik (Teks: "Warnanya Cantik BGT").
-      3. Scene 3: Try-on cepat/Fitting (Teks: "Link di Bio").
+      1. Scene 1: Buka paket dengan cutter ASMR (Teks Variasi: "Unboxing Time!" / "Paket Datang!").
+      2. Scene 2: Reveal produk dari plastik (Teks Variasi: "Warnanya Cantik BGT" / "Realpict Parah").
+      3. Scene 3: Try-on cepat/Fitting (Teks Variasi: "Link di Bio" / "Cek Keranjang").
     `;
   } else {
     // Natural / UGC
+    fixedBackground = "tidy modern bedroom, white bed sheets, small plant on nightstand, soft warm lamp";
     styleInstruction = `
-      GAYA VISUAL: HOME REVIEW (UGC). Background: Kamar Rapi. Lighting: ${lightingConsistency}.
+      GAYA VISUAL: HOME REVIEW (UGC). Background: ${fixedBackground}. Lighting: ${lightingConsistency}.
     `;
     structureInstruction = `
       STRUKTUR SCENE (UGC FLOW):
-      1. SCENE 1: Model duduk santai curhat soal baju (Teks: "Jujurly Bagus Banget").
-      2. SCENE 2: Berdiri pamer full body (Teks: "Cuttingan Juara").
-      3. SCENE 3: Ajak kembaran (Teks: "Buruan Checkout").
+      1. SCENE 1: Model duduk santai curhat soal baju (Teks Variasi: "Jujurly Bagus Banget" / "Baju ternyaman!").
+      2. SCENE 2: Berdiri pamer full body (Teks Variasi: "Cuttingan Juara" / "Bikin Langsing").
+      3. SCENE 3: Ajak kembaran (Teks Variasi: "Buruan Checkout" / "Samaan Yuk").
     `;
   }
 
@@ -175,7 +176,7 @@ export const generateManualPromptText = (config: CampaignConfig): string => {
 
   return `
 Role: Anda adalah Affiliate Video Director (Kling AI Expert).
-Tugas: Buat prompt video yang menjaga KONSISTENSI PRODUK dan MENGGUNAKAN TEKS BAHASA INDONESIA.
+Tugas: Buat prompt video yang menjaga KONSISTENSI PRODUK, KONSISTENSI BACKGROUND, dan MENGGUNAKAN TEKS BAHASA INDONESIA.
 
 KONTEKS:
 ${productNameContext}
@@ -184,15 +185,11 @@ ${styleInstruction}
 ${structureInstruction}
 
 ATURAN GENERASI:
-1. **FORMAT VIDEO (MUTLAK)**: Setiap 'kling_video_prompt' WAJIB diawali dengan teks: "Vertical video 9:16,". Jangan pernah membuat prompt landscape/16:9. Pastikan deskripsi visual mendukung format vertikal.
-2. **BAHASA INDONESIA**: Field 'cta_text' WAJIB Bahasa Indonesia, gaya bahasa santai/marketing, MAKSIMAL 5-6 KATA. Jangan bahasa Inggris.
-3. **KONSISTENSI BACKGROUND**: Pastikan prompt background selalu menyertakan "${rackDescription}" agar isi rak sesuai gender.
+1. **FORMAT VIDEO (MUTLAK)**: Setiap 'kling_video_prompt' WAJIB diawali dengan teks: "Vertical video 9:16,".
+2. **KONSISTENSI BACKGROUND (CRITICAL)**: Anda WAJIB menyertakan frasa berikut di SETIAP 'image_prompt' dan 'kling_video_prompt' untuk menjaga konsistensi tempat: "${fixedBackground}". Jangan ubah deskripsi background antar scene.
+3. **BAHASA INDONESIA**: Output 'cta_text' HARUS Bahasa Indonesia gaul/marketing.
 4. **DETAIL PRODUK**: Deskripsikan warna dan motif baju secara eksplisit.
-5. **MOVEMENT**: Untuk Video Prompt, gunakan kata kerja aktif (Walking, Touching, Turning, Smiling).
-6. **CAPTION VIRAL**: Buat field 'social_media_caption' berisi caption TikTok/Shopee yang menarik.
-   - Maksimal 150 Karakter.
-   - Mengandung Hook yang relevan dengan produk.
-   - Wajib sertakan hashtag relevan (contoh: #racunshopee #ootd #fyp #outfitinspiration).
+5. **VARIASI TEKS**: Pilih kata-kata marketing yang berbeda-beda setiap kali generate.
 
 STRUKTUR OUTPUT (JSON MURNI):
 {
@@ -202,22 +199,22 @@ STRUKTUR OUTPUT (JSON MURNI):
     {
       "scene_title": "Scene 1: The Hook",
       "angle_description": "Low Angle / Dynamic Entrance",
-      "image_prompt": "Vertical portrait 9:16, low angle shot of Indonesian model wearing [INSERT DETAILED PRODUCT DESCRIPTION HERE], looking confident, walking pose, minimalist aesthetic studio with pampas grass and ${rackDescription}, 8k, photorealistic",
-      "kling_video_prompt": "Vertical video 9:16, low angle, model wearing [INSERT DETAILED PRODUCT DESCRIPTION HERE] walking confidently into frame towards camera, sharp focus, aesthetic studio background, ${lightingConsistency}",
+      "image_prompt": "Vertical portrait 9:16, low angle shot of Indonesian model wearing [INSERT DETAILED PRODUCT DESCRIPTION HERE], looking confident, walking pose, ${fixedBackground}, 8k, photorealistic",
+      "kling_video_prompt": "Vertical video 9:16, low angle, model wearing [INSERT DETAILED PRODUCT DESCRIPTION HERE] walking confidently into frame towards camera, ${fixedBackground}, ${lightingConsistency}",
       "cta_text": "Definisi Elegan ✨"
     },
     {
       "scene_title": "Scene 2: Quality Proof",
       "angle_description": "Extreme Close Up (Hand Interaction)",
-      "image_prompt": "Vertical portrait 9:16, extreme close up of [INSERT DETAILED PRODUCT DESCRIPTION HERE] fabric texture, model's hand touching the material gently, soft lighting, high detail, depth of field",
-      "kling_video_prompt": "Vertical video 9:16, extreme close up, hand gently brushing against the fabric of [INSERT DETAILED PRODUCT DESCRIPTION HERE] to show softness, slow motion, ${lightingConsistency}",
+      "image_prompt": "Vertical portrait 9:16, extreme close up of [INSERT DETAILED PRODUCT DESCRIPTION HERE] fabric texture, model's hand touching the material gently, soft lighting, ${fixedBackground} (slightly blurred), high detail",
+      "kling_video_prompt": "Vertical video 9:16, extreme close up, hand gently brushing against the fabric of [INSERT DETAILED PRODUCT DESCRIPTION HERE] to show softness, slow motion, ${fixedBackground} (blurred background), ${lightingConsistency}",
       "cta_text": "Bahannya Premium Parah 😭"
     },
     {
       "scene_title": "Scene 3: The Call",
       "angle_description": "Medium Shot (Mirror/Final Pose)",
-      "image_prompt": "Vertical portrait 9:16, medium shot of Indonesian model wearing [INSERT DETAILED PRODUCT DESCRIPTION HERE], looking at camera with satisfied smile, hand pointing down, aesthetic studio background with ${rackDescription}",
-      "kling_video_prompt": "Vertical video 9:16, medium shot, model wearing [INSERT DETAILED PRODUCT DESCRIPTION HERE] checking appearance in mirror then turning to smile at camera and pointing down, ${lightingConsistency}",
+      "image_prompt": "Vertical portrait 9:16, medium shot of Indonesian model wearing [INSERT DETAILED PRODUCT DESCRIPTION HERE], looking at camera with satisfied smile, hand pointing down, ${fixedBackground}",
+      "kling_video_prompt": "Vertical video 9:16, medium shot, model wearing [INSERT DETAILED PRODUCT DESCRIPTION HERE] checking appearance in mirror then turning to smile at camera and pointing down, ${fixedBackground}, ${lightingConsistency}",
       "cta_text": "Stok Dikit, Amankan! 👇"
     }
   ]
@@ -242,10 +239,10 @@ export const generateAffiliatePrompts = async (
     CRITICAL INSTRUCTION:
     1. **ANALISIS VISUAL**: Lihat warna baju, motif, dan bentuk kerah dengan sangat teliti. JANGAN UBAH WARNA.
     2. **FORMAT VIDEO**: Wajib PORTRAIT / VERTICAL. Semua prompt video harus diawali "Vertical video 9:16,".
-    3. **BAHASA**: Output 'cta_text' HARUS Bahasa Indonesia gaul/marketing (pendek, padat, jelas).
-    4. **PROPS**: Sesuaikan isi rak baju di background dengan gender model.
-    5. **CAPTION**: Buat 'social_media_caption' maksimal 150 char, viral marketing style + hashtags (#fyp, #racunshopee, etc).
-    6. **STRUKTUR**: Ikuti struktur "Viral Studio Formula" (Hook -> Proof -> CTA).
+    3. **BACKGROUND KONSISTEN**: Gunakan deskripsi background yang SAMA PERSIS untuk ketiga scene (White cyclorama, beige floor, etc) sesuai konfigurasi.
+    4. **BAHASA**: Output 'cta_text' HARUS Bahasa Indonesia gaul/marketing (pendek, padat, jelas).
+    5. **STRUKTUR**: Ikuti struktur "Viral Studio Formula" (Hook -> Proof -> CTA).
+    6. **VARIASI**: Gunakan variasi naskah yang berbeda-beda untuk cta_text agar tidak monoton.
     
     ${generateManualPromptText(config)}
   `;
