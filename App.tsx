@@ -3,6 +3,7 @@ import { UploadIcon, ManIcon, WomanIcon, HijabIcon, BoxIcon, CameraIcon, PhoneIc
 import { generateAffiliatePrompts, generateManualPromptText } from './services/geminiService';
 import { GeneratedCampaign, ProcessStatus, ModelType, StyleType, CampaignConfig, ImageQuality } from './types';
 import { SceneCard } from './components/SceneCard';
+import { CopyButton } from './components/CopyButton';
 
 const App: React.FC = () => {
   const [file, setFile] = useState<File | null>(null);
@@ -436,6 +437,27 @@ const App: React.FC = () => {
                   </span>
                 </div>
               </div>
+
+               {/* VIRAL CAPTION BOX */}
+               {result.social_media_caption && (
+                <div className="bg-gradient-to-r from-pink-900/30 to-purple-900/30 border border-pink-500/30 rounded-xl p-6 relative">
+                  <div className="flex items-center justify-between mb-3">
+                    <h3 className="text-pink-300 font-bold flex items-center gap-2">
+                       <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-5.2 1.74 2.89 2.89 0 0 1 2.31-4.64 2.93 2.93 0 0 1 .88.13V9.4a6.84 6.84 0 0 0-1-.05A6.33 6.33 0 0 0 5 20.1a6.34 6.34 0 0 0 10.86-4.43v-7a8.16 8.16 0 0 0 4.77 1.52v-3.4a4.85 4.85 0 0 1-1-.1z"/></svg>
+                       Viral TikTok/Shopee Caption
+                    </h3>
+                    <CopyButton text={result.social_media_caption} label="Copy Caption" />
+                  </div>
+                  <div className="bg-slate-950/50 p-4 rounded-lg border border-slate-700/50">
+                    <p className="text-slate-200 font-medium leading-relaxed">
+                      {result.social_media_caption}
+                    </p>
+                    <p className="text-right text-xs text-slate-500 mt-2">
+                       {result.social_media_caption.length} / 150 chars
+                    </p>
+                  </div>
+                </div>
+              )}
               
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {result.scenes.map((scene, index) => (

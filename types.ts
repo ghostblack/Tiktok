@@ -9,6 +9,7 @@ export interface ScenePrompt {
 
 export interface GeneratedCampaign {
   product_name: string;
+  social_media_caption: string; // New field for viral hashtags/caption
   scenes: ScenePrompt[];
 }
 
