@@ -19,8 +19,8 @@ export enum ProcessStatus {
   ERROR = 'ERROR'
 }
 
-export type ModelType = 'indo_man' | 'indo_woman' | 'no_model';
-export type StyleType = 'cinematic' | 'natural';
+export type ModelType = 'indo_man' | 'indo_woman' | 'indo_hijab' | 'no_model';
+export type StyleType = 'cinematic' | 'natural' | 'unboxing';
 export type ImageQuality = 'standard' | 'premium';
 
 export interface CampaignConfig {

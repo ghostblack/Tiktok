@@ -8,7 +8,7 @@ const getApiKey = (): string => {
   return key;
 };
 
-// Variabel throttling (Removed strict throttling for paid/pro usage, kept only minimal buffer)
+// Variabel throttling
 let lastRequestTime = 0;
 const MIN_REQUEST_INTERVAL = 500; // 0.5 Detik buffer
 
@@ -75,42 +75,98 @@ const retryWithBackoff = async <T>(
 
 // EXPORTED HELPER: Generate Prompt Text for Manual Mode
 export const generateManualPromptText = (config: CampaignConfig): string => {
+  // 1. TENTUKAN LIGHTING KEYWORDS YANG KONSISTEN
+  let lightingConsistency = "";
+  if (config.styleType === 'cinematic') {
+    lightingConsistency = "bright soft diffused studio lighting, neutral minimalist background, realistic product colors, 8k resolution, commercial videography";
+  } else {
+    lightingConsistency = "natural soft window light, bright and airy, consistent daylight temperature, soft shadows, realistic colors";
+  }
+
+  // 2. TENTUKAN BACKGROUND PROPS BERDASARKAN GENDER
+  let rackDescription = "";
   let modelInstruction = "";
+  
   if (config.modelType === 'indo_man') {
+    rackDescription = "clothing rack hanging MEN'S minimalist jackets and shirts in background";
     modelInstruction = `
       MODEL UTAMA: Pria Indonesia (Indonesian Man).
-      
-      ATURAN KONSISTENSI KARAKTER (WAJIB):
-      1. Tentukan SATU outfit spesifik. Contoh: "Wearing a plain solid black t-shirt".
-      2. Tentukan fitur wajah spesifik. Contoh: "Short fade haircut, brown skin".
-      3. ANDA WAJIB MENULIS ULANG deskripsi pakaian dan fisik ini secara LENGKAP di SETIAP field "image_prompt" (Scene 1, 2, & 3).
-      4. Karakter harus terlihat SAMA PERSIS (Same Person, Same Clothes) di semua scene.
+      ATURAN KONSISTENSI:
+      1. Wajah: "Short fade haircut, brown skin, friendly face".
+      2. PENTING: Model SEDANG MEMAKAI PRODUK tersebut.
+      3. Background: Ada rak baju isinya pakaian cowok (jaket/kemeja).
     `;
   } else if (config.modelType === 'indo_woman') {
+    rackDescription = "clothing rack hanging WOMEN'S aesthetic blouses and dresses in background";
     modelInstruction = `
       MODEL UTAMA: Wanita Indonesia (Indonesian Woman).
-      
-      ATURAN KONSISTENSI KARAKTER (WAJIB):
-      1. Tentukan SATU outfit spesifik. Contoh: "Wearing a beige modest blouse and white pants".
-      2. Tentukan fitur wajah spesifik. Contoh: "Long straight black hair, soft natural makeup".
-      3. ANDA WAJIB MENULIS ULANG deskripsi pakaian dan fisik ini secara LENGKAP di SETIAP field "image_prompt" (Scene 1, 2, & 3).
-      4. Karakter harus terlihat SAMA PERSIS (Same Person, Same Clothes) di semua scene.
+      ATURAN KONSISTENSI:
+      1. Wajah: "Long straight black hair, soft natural makeup, indonesian features".
+      2. PENTING: Model SEDANG MEMAKAI PRODUK tersebut.
+      3. Background: Ada rak baju isinya pakaian cewek (dress/blouse).
+    `;
+  } else if (config.modelType === 'indo_hijab') {
+    rackDescription = "clothing rack hanging modest muslim fashion, tunics, and robes in background";
+    modelInstruction = `
+      MODEL UTAMA: Wanita Indonesia Berhijab (Indonesian Hijabi Woman).
+      ATURAN KONSISTENSI:
+      1. Wajah: "Wearing elegant modern hijab (matching product color), soft natural makeup, indonesian features".
+      2. PENTING: Model SEDANG MEMAKAI PRODUK tersebut dengan gaya sopan/muslimah.
+      3. Background: Ada rak baju isinya busana muslim modern.
     `;
   } else {
+    rackDescription = "clothing rack with minimalist aesthetic outfits in background";
     modelInstruction = `
       MODEL UTAMA: TIDAK ADA MANUSIA (Product Only).
-      
-      ATURAN KONSISTENSI BACKGROUND (WAJIB):
-      1. Tentukan SATU setting meja/ruangan. Contoh: "On a white minimalist wooden table with a small plant in background".
-      2. Ulangi deskripsi setting ini di setiap scene agar lokasi tidak berubah-ubah.
+      Fokus pada produk di hanger atau manekin.
     `;
   }
 
   let styleInstruction = "";
+  let structureInstruction = "";
+
   if (config.styleType === 'cinematic') {
-    styleInstruction = `GAYA VISUAL: CLEAN STUDIO REVIEW. Background: Tembok studio polos atau rak minimalis yang blur. Lighting: Softbox lighting (terang tapi lembut). Vibe: Profesional tech/product reviewer, bersih.`;
+    styleInstruction = `
+      GAYA VISUAL: AESTHETIC FASHION STUDIO. 
+      Background: Ruangan studio minimalis dinding putih bersih, ada cermin lengkung (arched mirror), tanaman pampas, dan ${rackDescription}.
+      Fokus Utama: PRODUK HARUS SAMA PERSIS WARNANYA DENGAN GAMBAR ASLI.
+    `;
+    structureInstruction = `
+      STRUKTUR SCENE (FASHION MODEL FLOW):
+      1. Scene 1 (Fitting & Showcase): MEDIUM SHOT.
+         - Visual: Model SUDAH MEMAKAI baju tersebut di tengah studio estetik.
+         - Gerakan: Model melakukan gerakan memutar badan perlahan (body turn) atau berjalan di tempat (catwalk) untuk menunjukkan potongan baju.
+         - Teks Layar: Headline Singkat (Contoh: "OOTD Wajib Punya!").
+      
+      2. Scene 2 (Detail & Texture): CLOSE UP.
+         - Visual: Kamera zoom in ke bagian dada/lengan baju yang dipakai model.
+         - Gerakan: Model memegang kerah atau merapikan baju dengan lembut.
+         - Teks Layar: Fitur Utama (Contoh: "Bahannya Adem Banget").
+
+      3. Scene 3 (Persuasion/CTA): MEDIUM SHOT.
+         - Visual: Model (masih memakai baju yang sama) tersenyum ke kamera, pose "mengajak".
+         - Gerakan: Static shot, tangan menunjuk ke arah keranjang kuning (imajiner) atau jempol.
+         - Teks Layar: Ajakan Beli (Contoh: "Cek Keranjang Kuning!").
+    `;
+  } else if (config.styleType === 'unboxing') {
+    styleInstruction = `GAYA VISUAL: UNBOXING POV. Background: Meja estetik. Lighting: ${lightingConsistency}.`;
+    structureInstruction = `
+      STRUKTUR SCENE (UNBOXING):
+      1. Scene 1: Buka paket (Teks: "Unboxing Time!").
+      2. Scene 2: Lihat produk (Teks: "Warnanya Cantik BGT").
+      3. Scene 3: Pakai produk (Teks: "Link di Bio").
+    `;
   } else {
-    styleInstruction = `GAYA VISUAL: HOME REVIEW (UGC). Background: Kamar tidur atau ruang tamu yang rapi tapi "homey". Lighting: Natural window light. Vibe: Jujur, autentik, barang dipakai sehari-hari.`;
+    // Natural / UGC
+    styleInstruction = `
+      GAYA VISUAL: HOME REVIEW (UGC). Background: Kamar Rapi. Lighting: ${lightingConsistency}.
+    `;
+    structureInstruction = `
+      STRUKTUR SCENE (UGC FLOW):
+      1. SCENE 1: Model pamer produk (Teks: "Racun Shopee/TikTok").
+      2. SCENE 2: Detail bahan (Teks: "Premium Quality").
+      3. SCENE 3: Review happy (Teks: "Buruan Checkout").
+    `;
   }
 
   const productNameContext = config.productName 
@@ -118,46 +174,45 @@ export const generateManualPromptText = (config: CampaignConfig): string => {
     : `NAMA PRODUK: Analisis dari gambar yang saya upload.`;
 
   return `
-Role: Anda adalah Affiliate Content Strategist.
-Tugas: Buat struktur konten video pendek (3 Scene) yang KONSISTEN.
+Role: Anda adalah Affiliate Video Director (Kling AI Expert).
+Tugas: Buat prompt video yang menjaga KONSISTENSI PRODUK dan MENGGUNAKAN TEKS BAHASA INDONESIA.
 
-KONTEKS PENGGUNA:
+KONTEKS:
 ${productNameContext}
 ${modelInstruction}
 ${styleInstruction}
+${structureInstruction}
 
-ATURAN UTAMA (STRICT):
-1. LOKASI WAJIB INDOOR/DALAM RUANGAN.
-2. KONSISTENSI VISUAL: Gunakan deskripsi karakter/outfit yang SAMA PERSIS (Copy-Paste) di setiap scene.
-3. WAJIB DETAIL PRODUK: Salah satu dari Scene 1 atau Scene 2 HARUS menggunakan angle "Extreme Close Up" atau "Macro Shot" untuk memperlihatkan tekstur/kualitas produk.
-4. Prompt Gambar: Tambahkan "no text, no watermark, no typography, clean image" di akhir.
-5. Prompt Video (kling_video_prompt): WAJIB PORTRAIT/VERTICAL (9:16). Tambahkan kata kunci "Vertical video, portrait mode" di awal prompt. Fokus pada gerakan tangan atau panning.
-6. Naskah: Santai & persuasif.
+ATURAN GENERASI:
+1. **BAHASA INDONESIA**: Field 'cta_text' WAJIB Bahasa Indonesia, gaya bahasa santai/marketing, MAKSIMAL 5-6 KATA. Jangan bahasa Inggris.
+2. **KONSISTENSI BACKGROUND**: Pastikan prompt background selalu menyertakan "${rackDescription}" agar isi rak sesuai gender.
+3. **DETAIL PRODUK**: Deskripsikan warna dan motif baju secara eksplisit (misal: "Black shirt with white embroidery").
+4. **HIJAB (JIKA BERLAKU)**: Jika model berhijab, pastikan prompt mencantumkan "wearing modern hijab matching the outfit".
 
-STRUKTUR OUTPUT (WAJIB JSON MURNI):
+STRUKTUR OUTPUT (JSON MURNI):
 {
   "product_name": "Nama Produk",
   "scenes": [
     {
-      "scene_title": "Scene 1: Intro/Hook",
-      "angle_description": "Medium Shot / Eye Level",
-      "image_prompt": "[Deskripsi Karakter SAMA] holding product...",
-      "kling_video_prompt": "Vertical video, portrait mode, [Deskripsi Gerakan]...",
-      "cta_text": "..."
+      "scene_title": "Scene 1: Fitting Look",
+      "angle_description": "Medium Shot (Body Rotation)",
+      "image_prompt": "Medium shot of Indonesian model wearing [INSERT DETAILED PRODUCT DESCRIPTION HERE], standing in minimalist aesthetic studio with pampas grass and ${rackDescription}, white walls, soft bright lighting, photorealistic, 8k",
+      "kling_video_prompt": "Vertical video 9:16, medium shot of model wearing [INSERT DETAILED PRODUCT DESCRIPTION HERE], turning body slowly to show the outfit, minimalist white studio background with ${rackDescription}, bright soft lighting, high quality, ${lightingConsistency}",
+      "cta_text": "OOTD Kekinian Banget ✨"
     },
     {
-      "scene_title": "Scene 2: Detail Texture (WAJIB CLOSE UP)",
-      "angle_description": "Extreme Close Up / Macro Shot",
-      "image_prompt": "Extreme close up of the product texture/details, [Deskripsi Karakter SAMA]...",
-      "kling_video_prompt": "Vertical video, portrait mode, camera slowly zooms in to show texture...",
-      "cta_text": "..."
+      "scene_title": "Scene 2: Fabric Detail",
+      "angle_description": "Close Up",
+      "image_prompt": "Close up shot of the chest area of [INSERT DETAILED PRODUCT DESCRIPTION HERE] worn by model, showing fabric texture, high detail, sharp focus, aesthetic lighting",
+      "kling_video_prompt": "Vertical video 9:16, close up shot of [INSERT DETAILED PRODUCT DESCRIPTION HERE] fabric texture, model hand touching the material, soft movement, high detail, ${lightingConsistency}",
+      "cta_text": "Bahannya Lembut & Adem ☁️"
     },
     {
-      "scene_title": "Scene 3: Outro/CTA",
-      "angle_description": "Wide Shot",
-      "image_prompt": "[Deskripsi Karakter SAMA] showing thumb up...",
-      "kling_video_prompt": "Vertical video, portrait mode, [Deskripsi Gerakan]...",
-      "cta_text": "..."
+      "scene_title": "Scene 3: Invitation",
+      "angle_description": "Medium Shot (CTA)",
+      "image_prompt": "Medium shot of Indonesian model wearing [INSERT DETAILED PRODUCT DESCRIPTION HERE], smiling warmly and pointing finger up, aesthetic fashion studio background with ${rackDescription}, bright lighting",
+      "kling_video_prompt": "Vertical video 9:16, medium shot, model wearing [INSERT DETAILED PRODUCT DESCRIPTION HERE] smiling enthusiastically at camera, hand pointing to imaginary cart, static camera, ${lightingConsistency}",
+      "cta_text": "Cek Keranjang Kuning 👇"
     }
   ]
 }
@@ -173,11 +228,17 @@ export const generateAffiliatePrompts = async (
   if (!apiKey) throw new Error("API Key missing");
 
   const ai = new GoogleGenAI({ apiKey });
-  // Text generation always uses efficient Flash model
   const modelId = "gemini-2.5-flash"; 
 
   const systemInstruction = `
-    Anda adalah Direktur Kreatif AI. Output WAJIB JSON.
+    Anda adalah Director Video AI Profesional khusus pasar Indonesia.
+    
+    CRITICAL INSTRUCTION:
+    1. **ANALISIS VISUAL**: Lihat warna baju, motif, dan bentuk kerah dengan sangat teliti. JANGAN UBAH WARNA.
+    2. **BAHASA**: Output 'cta_text' HARUS Bahasa Indonesia gaul/marketing (pendek, padat, jelas).
+    3. **PROPS**: Sesuaikan isi rak baju di background dengan gender model.
+    4. **MODEL**: Jika model hijab, pastikan deskripsi prompt selalu "Indonesian Hijabi Woman wearing modern hijab".
+    
     ${generateManualPromptText(config)}
   `;
 
@@ -186,7 +247,6 @@ export const generateAffiliatePrompts = async (
     config: {
       systemInstruction: systemInstruction,
       responseMimeType: "application/json",
-      // Schema didefinisikan untuk API Mode
       responseSchema: {
         type: Type.OBJECT,
         properties: {
@@ -212,7 +272,7 @@ export const generateAffiliatePrompts = async (
     contents: {
       parts: [
         { inlineData: { mimeType: mimeType, data: imageBase64 } },
-        { text: "Generate JSON campaign with STRICT character consistency and CLOSE UP shot." }
+        { text: "Generate JSON campaign. Analyze product color carefully. Use Indonesian language for CTA." }
       ]
     }
   }));
@@ -231,7 +291,6 @@ export const generateImageFromPrompt = async (
 
   const ai = new GoogleGenAI({ apiKey });
   
-  // SELECT MODEL BASED ON QUALITY CONFIG
   const modelId = quality === 'premium' 
     ? "gemini-3-pro-image-preview" 
     : "gemini-2.5-flash-image";
@@ -240,25 +299,24 @@ export const generateImageFromPrompt = async (
 
   const parts: any[] = [];
   
-  // Revised prompt prefix for "Simple Indoor/Studio Review"
   let visualStyle = "";
   if (quality === 'premium') {
-    visualStyle = "High-quality product photography, indoor studio setting, soft lighting, 8k, photorealistic, blurred background. ";
+    visualStyle = "Fashion photography, 8k resolution, photorealistic. Background: blurred minimalist white studio with specific clothing rack. Subject:";
   } else {
-    visualStyle = "Simple indoor product review photo, good lighting, realistic. ";
+    visualStyle = "Realistic product photo. Background: bright clean studio. Subject:";
   }
   
-  // We append specific "Indoor/Tabletop" keywords and NEGATIVE TEXT prompt to ensure clean images
-  const finalPrompt = `${visualStyle} ${prompt}, indoor setting, depth of field, no text, no watermark, no typography, clean image.`;
+  const constraint = "IMPORTANT: The product worn/shown MUST match the reference image exactly in COLOR, PATTERN, and DESIGN. Do not change the product color.";
+  
+  const finalPrompt = `${visualStyle} ${prompt}. ${constraint}`;
 
   if (referenceImageBase64) {
     parts.push({ inlineData: { mimeType: "image/jpeg", data: referenceImageBase64 } });
-    parts.push({ text: "Generate image based on this product. " + finalPrompt });
+    parts.push({ text: "Reference image provided. " + finalPrompt });
   } else {
     parts.push({ text: finalPrompt });
   }
 
-  // Config options differ slightly by model capability
   const imageConfig = quality === 'premium' 
     ? { aspectRatio: "9:16", imageSize: "1K" }
     : { aspectRatio: "9:16" };

@@ -1,5 +1,5 @@
-import React, { useState, useRef } from 'react';
-import { UploadIcon, ManIcon, WomanIcon, BoxIcon, CameraIcon, PhoneIcon, CopyIcon, CheckIcon } from './components/Icon';
+import React, { useState, useRef, useEffect } from 'react';
+import { UploadIcon, ManIcon, WomanIcon, HijabIcon, BoxIcon, CameraIcon, PhoneIcon, CopyIcon, CheckIcon } from './components/Icon';
 import { generateAffiliatePrompts, generateManualPromptText } from './services/geminiService';
 import { GeneratedCampaign, ProcessStatus, ModelType, StyleType, CampaignConfig, ImageQuality } from './types';
 import { SceneCard } from './components/SceneCard';
@@ -24,12 +24,55 @@ const App: React.FC = () => {
   const [manualJsonInput, setManualJsonInput] = useState("");
   const [manualPromptCopied, setManualPromptCopied] = useState(false);
 
+  // Drag & Drop State
+  const [isDragging, setIsDragging] = useState(false);
+
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Handle file selection
+  // GLOBAL PASTE LISTENER
+  useEffect(() => {
+    const handlePaste = (e: ClipboardEvent) => {
+      const items = e.clipboardData?.items;
+      if (items) {
+        for (let i = 0; i < items.length; i++) {
+          if (items[i].type.indexOf('image') !== -1) {
+            const blob = items[i].getAsFile();
+            if (blob) processFile(blob);
+            break;
+          }
+        }
+      }
+    };
+    window.addEventListener('paste', handlePaste);
+    return () => window.removeEventListener('paste', handlePaste);
+  }, []);
+
+  // Handle file selection via Input
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = event.target.files?.[0];
     if (selectedFile) processFile(selectedFile);
+  };
+
+  // Handle Drag & Drop
+  const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    setIsDragging(false);
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      processFile(e.dataTransfer.files[0]);
+    }
+  };
+
+  const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    setIsDragging(false);
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      processFile(e.dataTransfer.files[0]);
+    }
   };
 
   const processFile = async (selectedFile: File) => {
@@ -189,8 +232,15 @@ const App: React.FC = () => {
                <div className="bg-slate-900 rounded-2xl p-1 border border-slate-800 shadow-xl h-full">
                 <div 
                   className={`relative border-2 border-dashed rounded-xl p-8 flex flex-col items-center justify-center text-center transition-all h-[320px] ${
-                    previewUrl ? 'border-purple-500/30 bg-slate-800/50' : 'border-slate-700 hover:border-slate-500 hover:bg-slate-800/50 cursor-pointer'
+                    isDragging 
+                      ? 'border-purple-500 bg-purple-900/20 scale-[0.99]'
+                      : previewUrl 
+                        ? 'border-purple-500/30 bg-slate-800/50' 
+                        : 'border-slate-700 hover:border-slate-500 hover:bg-slate-800/50 cursor-pointer'
                   }`}
+                  onDragOver={handleDragOver}
+                  onDragLeave={handleDragLeave}
+                  onDrop={handleDrop}
                   onClick={() => !previewUrl && fileInputRef.current?.click()}
                 >
                   {previewUrl ? (
@@ -215,11 +265,11 @@ const App: React.FC = () => {
                     </div>
                   ) : (
                     <>
-                      <div className="bg-slate-800/50 p-4 rounded-full mb-4">
+                      <div className={`p-4 rounded-full mb-4 transition-colors ${isDragging ? 'bg-purple-600 text-white' : 'bg-slate-800/50 text-slate-500'}`}>
                          <UploadIcon />
                       </div>
                       <p className="mb-2 text-lg text-slate-300 font-semibold">
-                        Klik untuk Upload
+                        {isDragging ? 'Drop Gambar Disini' : 'Klik / Drag / Paste Gambar'}
                       </p>
                       <p className="text-sm text-slate-500 max-w-[200px]">
                         Gunakan foto produk yang jelas dan terang
@@ -233,6 +283,7 @@ const App: React.FC = () => {
 
             {/* Right Column: Configuration & Actions */}
             <div className="space-y-6 flex flex-col justify-center h-full">
+              {/* ... (rest of configuration UI) */}
               <div>
                 <h2 className="flex items-center gap-2 text-sm font-bold text-slate-400 uppercase tracking-wider mb-4">
                   <span className="w-6 h-6 rounded-full bg-slate-800 text-slate-400 flex items-center justify-center text-xs">2</span>
@@ -253,8 +304,9 @@ const App: React.FC = () => {
 
                   <div>
                     <label className="block text-sm font-medium text-slate-300 mb-2">Pilih Model Talent</label>
-                    <div className="grid grid-cols-3 gap-2">
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
                       <ModelOption type="indo_woman" label="Cewek Indo" icon={<WomanIcon />} />
+                      <ModelOption type="indo_hijab" label="Cewek Hijab" icon={<HijabIcon />} />
                       <ModelOption type="indo_man" label="Cowok Indo" icon={<ManIcon />} />
                       <ModelOption type="no_model" label="Tanpa Model" icon={<BoxIcon />} />
                     </div>
@@ -270,6 +322,7 @@ const App: React.FC = () => {
                         >
                             <option value="natural">Casual Home (UGC)</option>
                             <option value="cinematic">Clean Studio (Pro)</option>
+                            <option value="unboxing">Unboxing & Promo (Viral)</option>
                         </select>
                       </div>
                       <div>
@@ -375,8 +428,8 @@ const App: React.FC = () => {
                 </div>
                 <div className="flex gap-2">
                    <span className="text-sm bg-slate-800 text-slate-300 px-4 py-2 rounded-full border border-slate-700 flex items-center gap-2">
-                    {modelType === 'indo_woman' ? <WomanIcon /> : modelType === 'indo_man' ? <ManIcon /> : <BoxIcon />}
-                    {modelType === 'indo_woman' ? 'Cewek Indo' : modelType === 'indo_man' ? 'Cowok Indo' : 'Produk Only'}
+                    {modelType === 'indo_woman' ? <WomanIcon /> : modelType === 'indo_man' ? <ManIcon /> : modelType === 'indo_hijab' ? <HijabIcon /> : <BoxIcon />}
+                    {modelType === 'indo_woman' ? 'Cewek Indo' : modelType === 'indo_man' ? 'Cowok Indo' : modelType === 'indo_hijab' ? 'Cewek Hijab' : 'Produk Only'}
                   </span>
                    <span className={`text-sm px-4 py-2 rounded-full border flex items-center gap-2 ${imageQuality === 'premium' ? 'bg-purple-900/30 border-purple-500 text-purple-300' : 'bg-green-900/30 border-green-500 text-green-300'}`}>
                     {imageQuality === 'premium' ? '💎 Premium Mode' : '⚡ Standard Mode'}
