@@ -9,32 +9,42 @@ const getApiKey = (): string => {
   return key;
 };
 
-// Variabel throttling
+// === STRICT THROTTLING SYSTEM ===
+// Mencegah request paralel yang menyebabkan overload 503/429
 let lastRequestTime = 0;
-const MIN_REQUEST_INTERVAL = 500; // 0.5 Detik buffer
+const MIN_REQUEST_INTERVAL = 2000; // Jeda 2 Detik antar request (Safe Mode)
+let throttleQueue = Promise.resolve();
 
-const enforceThrottling = async () => {
-  const now = Date.now();
-  const timeSinceLastRequest = now - lastRequestTime;
+const enforceThrottling = () => {
+  // Chain promises untuk memaksa eksekusi berurutan (Serial Queue)
+  const next = throttleQueue.then(async () => {
+    const now = Date.now();
+    const timeSinceLastRequest = now - lastRequestTime;
 
-  if (timeSinceLastRequest < MIN_REQUEST_INTERVAL) {
-    const waitTime = MIN_REQUEST_INTERVAL - timeSinceLastRequest;
-    await new Promise(resolve => setTimeout(resolve, waitTime));
-  }
+    if (timeSinceLastRequest < MIN_REQUEST_INTERVAL) {
+      const waitTime = MIN_REQUEST_INTERVAL - timeSinceLastRequest;
+      console.log(`⏳ Throttling: Menunggu ${waitTime}ms agar tidak overload...`);
+      await new Promise(resolve => setTimeout(resolve, waitTime));
+    }
+    
+    lastRequestTime = Date.now();
+  });
   
-  lastRequestTime = Date.now();
+  // Update antrian
+  throttleQueue = next.catch(() => {}); // Catch error agar antrian tidak macet total jika satu gagal
+  return next;
 };
 
 const retryWithBackoff = async <T>(
   operation: () => Promise<T>,
-  retries: number = 3,
-  initialDelay: number = 2000
+  retries: number = 5, // Naikkan retry ke 5x
+  initialDelay: number = 3000 // Naikkan delay awal ke 3s
 ): Promise<T> => {
   let lastError: any;
   
   for (let i = 0; i < retries; i++) {
     try {
-      await enforceThrottling(); // Cek throttling sebelum request
+      await enforceThrottling(); // Tunggu giliran antrian
       return await operation();
     } catch (error: any) {
       lastError = error;
@@ -53,18 +63,20 @@ const retryWithBackoff = async <T>(
         (error.message && error.message.toLowerCase().includes('unavailable'));
 
       if ((isRateLimit || isOverloaded) && i < retries - 1) {
-        let waitTime = initialDelay * Math.pow(2, i);
-        waitTime += Math.random() * 1000;
+        // Logika Backoff Eksponensial yang lebih sabar
+        let waitTime = initialDelay * Math.pow(2, i); // 3s, 6s, 12s, 24s...
+        waitTime += Math.random() * 1000; // Jitter
 
+        // Jika server memberi hint waktu tunggu
         if (error.message) {
             const match = error.message.match(/retry in (\d+(\.\d+)?)s/);
             if (match && match[1]) {
                 const serverRequestedWait = parseFloat(match[1]) * 1000;
-                waitTime = Math.max(waitTime, serverRequestedWait + 1000);
+                waitTime = Math.max(waitTime, serverRequestedWait + 2000);
             }
         }
 
-        console.warn(`Gemini API Busy/Rate Limited. Waiting ${Math.round(waitTime/1000)}s...`);
+        console.warn(`⚠️ Server Busy/Overloaded (Attempt ${i+1}/${retries}). Cooling down for ${Math.round(waitTime/1000)}s...`);
         await new Promise(resolve => setTimeout(resolve, waitTime));
         continue;
       }
@@ -80,7 +92,10 @@ export const generateManualPromptText = (config: CampaignConfig): string => {
   
   // 0. DETECT PRODUCT CONTEXT (SMART TAGS)
   const isRain = lowerName.includes('hujan') || lowerName.includes('mantel') || lowerName.includes('waterproof') || lowerName.includes('payung') || lowerName.includes('anti air');
-  const isBatik = lowerName.includes('batik') || lowerName.includes('kebaya') || lowerName.includes('kondangan') || lowerName.includes('pesta') || lowerName.includes('wisuda') || lowerName.includes('kutu baru');
+  
+  // Batik logic expanded
+  const isBatik = lowerName.includes('batik') || lowerName.includes('kebaya') || lowerName.includes('kondangan') || lowerName.includes('pesta') || lowerName.includes('wisuda') || lowerName.includes('kutu baru') || lowerName.includes('brokat') || lowerName.includes('etnik') || lowerName.includes('tenun');
+  
   const isOutdoorGear = lowerName.includes('gunung') || lowerName.includes('hiking') || lowerName.includes('camping') || lowerName.includes('jaket outdoor') || lowerName.includes('carrier') || lowerName.includes('tenda');
 
   // 1. KONSISTENSI VISUAL (LIGHTING)
@@ -149,9 +164,15 @@ export const generateManualPromptText = (config: CampaignConfig): string => {
     // CINEMATIC LOGIC
     fixedBackground = `luxury minimalist studio, pure white cyclorama wall, warm beige concrete floor, large arched standing mirror on left, dried pampas grass in ceramic vase on right, clothing rack with ${rackContent} in background center`;
     
-    // Override for Batik in Cinematic
+    // Override for Batik in Cinematic (Specific Contexts)
     if (isBatik) {
-        fixedBackground = "Luxury Indonesian Wedding Hall interior, gold and floral decoration, warm elegant ambiance, carpeted floor";
+        if (lowerName.includes('kerja') || lowerName.includes('kantor') || lowerName.includes('dinas') || lowerName.includes('guru') || lowerName.includes('pemda')) {
+            fixedBackground = "Modern Indonesian Office Lobby (SCBD Style), high ceiling, marble floor, bright professional lighting, glass windows with city view";
+        } else if (lowerName.includes('wisuda') || lowerName.includes('nikah') || lowerName.includes('lamaran')) {
+            fixedBackground = "Luxury Indonesian Wedding Hall interior, gold and floral decoration, warm elegant ambiance, carpeted floor";
+        } else {
+            fixedBackground = "Grand Heritage Hotel Lobby or Art Gallery in Jakarta, colonial architecture, teak wood accents, warm elegant lighting, marble floor";
+        }
     }
 
     if (config.modelType === 'no_model') {
@@ -214,23 +235,51 @@ export const generateManualPromptText = (config: CampaignConfig): string => {
         }
     
     } else if (isBatik) {
-        // --- BATIK / FORMAL ---
-        fixedBackground = "Outdoor Indonesian Garden Party wedding venue, green grass, janur kuning decoration in background, warm golden hour lighting";
+        // --- BATIK / KEBAYA / TRADITIONAL SMART LOGIC ---
         
-        if (config.modelType === 'no_model') {
+        // 1. Context: OFFICE / KERJA (Formal Modern)
+        if (lowerName.includes('kerja') || lowerName.includes('kantor') || lowerName.includes('dinas') || lowerName.includes('guru') || lowerName.includes('senin') || lowerName.includes('jumat')) {
+            fixedBackground = "Modern Indonesian Office Lobby (SCBD Area), bright daylight, glass walls, marble floor, professional atmosphere";
+            
             structureInstruction = `
-            STRUKTUR SCENE (BATIK - PRODUCT DISPLAY):
-            SCENE 1 (THE VIBE): Visual: Kain/Baju batik digantung estetik dengan background dekorasi pesta kebun. Text: "Mewah buat kondangan ✨".
-            SCENE 2 (THE PATTERN): Visual: Macro shot motif batik dan tekstur kain yang premium/halus. Text: "Motifnya mahal banget".
-            SCENE 3 (THE OUTFIT): Visual: Flatlay batik dipadukan dengan aksesoris kondangan (tas/sepatu). Text: "Siap jadi pusat perhatian".
+            STRUKTUR SCENE (BATIK - OFFICE LOOK):
+            SCENE 1 (THE ENTRY): Visual: Model berjalan masuk lobby kantor dengan percaya diri. Background modern. Text: "Batik Jumat check! ✅".
+            SCENE 2 (THE DETAIL): Visual: Close up motif batik saat model memegang tas kerja/dokumen. Text: "Motifnya elegan, gak pasaran".
+            SCENE 3 (THE COMFORT): Visual: Model duduk santai atau pose candid di area lounge kantor. Text: "Dipake meeting seharian tetap nyaman".
             `;
+            
+        // 2. Context: CASUAL / MODERN (Hangout)
+        } else if (lowerName.includes('pendek') || lowerName.includes('modern') || lowerName.includes('kasual') || lowerName.includes('santai') || lowerName.includes('hangout')) {
+            fixedBackground = "Trendy Coffee Shop in South Jakarta (Jaksel vibe), industrial design, warm lighting, blurred plants";
+            
+            structureInstruction = `
+            STRUKTUR SCENE (BATIK - CASUAL HANGOUT):
+            SCENE 1 (THE VIBE): Visual: Model sedang pesan kopi atau duduk di cafe estetik. Text: "Siapa bilang Batik itu kaku? 😎".
+            SCENE 2 (THE LOOK): Visual: Model berdiri santai, tangan di saku (jika ada) atau pose luwes. Text: "Styling-nya gampang banget!".
+            SCENE 3 (THE CONFIDENCE): Visual: Model tertawa candid dengan teman (imajiner) atau main HP. Text: "Buat ngemal atau ngopi tetap kece".
+            `;
+            
+        // 3. Context: PARTY / KONDANGAN (The Classic)
+        } else if (lowerName.includes('kondangan') || lowerName.includes('pesta') || lowerName.includes('wisuda') || lowerName.includes('lamaran') || lowerName.includes('couple')) {
+            fixedBackground = "Outdoor Indonesian Garden Party wedding venue, green grass, janur kuning decoration in background, warm golden hour lighting";
+             
+            structureInstruction = `
+            STRUKTUR SCENE (BATIK - KONDANGAN MODE):
+            SCENE 1 (THE ARRIVAL): Visual: Model berjalan anggun memasuki area pesta kebun. Text: "OOTD Kondangan check ✅".
+            SCENE 2 (THE GLOW): Visual: Close up detail payet/motif terkena cahaya matahari sore (Golden Hour). Text: "Kelihatan mahal banget aslinya 😭".
+            SCENE 3 (THE POSE): Visual: Model pose formal tapi manis, tangan di depan. Text: "Siap jadi pusat perhatian!".
+            `;
+            
+        // 4. Context: GENERAL / HERITAGE (Default High Class)
         } else {
-            structureInstruction = `
-            STRUKTUR SCENE (BATIK - KONDANGAN VIBE):
-            SCENE 1 (THE ARRIVAL): Visual: Model berjalan anggun memasuki area pesta kebun (Garden Party). Text: "OOTD Kondangan check ✅".
-            SCENE 2 (THE CONFIDENCE): Visual: Pose candid, model merapikan kerah/lengan, tersenyum elegan. Text: "Berasa pakai baju jutaan 😭".
-            SCENE 3 (SOCIAL): Visual: Model menyapa tamu lain (blurred), terlihat percaya diri dan santun. Text: "Auto dipuji camer nih!".
-            `;
+             fixedBackground = "Luxury Heritage Resort or Pendopo Joglo in Indonesia, teak wood pillars, marble floor, warm atmosphere, tropical plants outside";
+             
+             structureInstruction = `
+             STRUKTUR SCENE (BATIK - CLASSIC ELEGANCE):
+             SCENE 1 (THE HERITAGE): Visual: Model berdiri di area pendopo/teras bangunan klasik. Angin meniup sedikit rambut/baju. Text: "Warisan budaya, look-nya mahal ✨".
+             SCENE 2 (THE MATERIAL): Visual: Tangan meraba kain halus. Lighting hangat. Text: "Adem, halus, gak gampang kusut".
+             SCENE 3 (THE STATEMENT): Visual: Full body shot dengan background arsitektur estetik. Text: "Wajib punya minimal satu di lemari!".
+             `;
         }
 
     } else if (isOutdoorGear) {
@@ -417,6 +466,7 @@ export const generateImageFromPrompt = async (
   const ai = new GoogleGenAI({ apiKey });
   
   // FORCE GEMINI 2.5 FLASH IMAGE FOR COST SAVINGS
+  // Menggunakan 'gemini-2.5-flash-image' sesuai dokumen untuk performa cepat dan hemat
   const modelId = "gemini-2.5-flash-image"; 
 
   console.log(`Generating image using ${modelId} (Flash mode)`);
