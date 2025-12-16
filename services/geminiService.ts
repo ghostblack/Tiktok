@@ -1,5 +1,6 @@
+
 import { GoogleGenAI, Type, GenerateContentResponse } from "@google/genai";
-import { GeneratedCampaign, CampaignConfig, ImageQuality } from "../types";
+import { GeneratedCampaign, CampaignConfig } from "../types";
 
 // Helper untuk mengambil API Key dengan aman
 const getApiKey = (): string => {
@@ -75,99 +76,221 @@ const retryWithBackoff = async <T>(
 
 // EXPORTED HELPER: Generate Prompt Text for Manual Mode
 export const generateManualPromptText = (config: CampaignConfig): string => {
-  // 1. TENTUKAN LIGHTING KEYWORDS YANG KONSISTEN
+  const lowerName = config.productName.toLowerCase();
+  
+  // 0. DETECT PRODUCT CONTEXT (SMART TAGS)
+  const isRain = lowerName.includes('hujan') || lowerName.includes('mantel') || lowerName.includes('waterproof') || lowerName.includes('payung') || lowerName.includes('anti air');
+  const isBatik = lowerName.includes('batik') || lowerName.includes('kebaya') || lowerName.includes('kondangan') || lowerName.includes('pesta') || lowerName.includes('wisuda') || lowerName.includes('kutu baru');
+  const isOutdoorGear = lowerName.includes('gunung') || lowerName.includes('hiking') || lowerName.includes('camping') || lowerName.includes('jaket outdoor') || lowerName.includes('carrier') || lowerName.includes('tenda');
+
+  // 1. KONSISTENSI VISUAL (LIGHTING)
   let lightingConsistency = "";
   if (config.styleType === 'cinematic') {
     lightingConsistency = "commercial fashion lighting, soft diffused studio light, bright neutral atmosphere, 8k resolution";
+  } else if (config.styleType === 'outdoor') {
+    lightingConsistency = "natural outdoor daylight, realistic shadows, street photography vibe, high contrast, cinematic depth of field";
   } else {
     lightingConsistency = "natural soft window light, bright and airy, consistent daylight temperature, soft shadows, realistic colors";
   }
 
-  // 2. TENTUKAN BACKGROUND PROPS BERDASARKAN GENDER
-  let rackContent = ""; // Isi raknya apa
+  // 2. KONSISTENSI BACKGROUND & MODEL (STRICT INDONESIAN FACE)
+  let rackContent = "";
   let modelInstruction = "";
+  let lockedFaceDescription = ""; // Variable to enforce identical face description
   
+  // Base instructions for Indonesian Look ensuring consistency
+  const indoBase = `
+    WAJAH & KULIT: Wajib "NATIVE INDONESIAN LOOK" (Wajah Melayu/Asia Tenggara).
+    SKIN TONE: Sawo Matang (Light Brown/Tan Skin). JANGAN PUTIH PUCAT.
+    ATURAN KRUSIAL: JANGAN GUNAKAN WAJAH DARI GAMBAR REFERENSI PRODUK. GENERATE WAJAH BARU yang fresh dan original.
+  `;
+
   if (config.modelType === 'indo_man') {
     rackContent = "hanging MEN'S minimalist jackets and shirts";
+    lockedFaceDescription = "handsome Indonesian man, 25 years old, sawo matang skin, short neat black hair, sharp jawline, warm dark brown eyes, oval face shape";
     modelInstruction = `
-      MODEL UTAMA: Pria Indonesia (Indonesian Man).
-      ATURAN KONSISTENSI:
-      1. Wajah: "Short fade haircut, brown skin, friendly face".
-      2. PENTING: Model SEDANG MEMAKAI PRODUK tersebut.
+      MODEL UTAMA: ${lockedFaceDescription}.
+      ${indoBase}
+      VIBE: Cool, Ramah, Maskulin tapi "Soft Boy" aesthetic.
     `;
   } else if (config.modelType === 'indo_woman') {
     rackContent = "hanging WOMEN'S aesthetic blouses and dresses";
+    lockedFaceDescription = "beautiful Indonesian woman, 22 years old, sawo matang skin, long straight black hair, soft oval face, almond dark brown eyes, natural makeup";
     modelInstruction = `
-      MODEL UTAMA: Wanita Indonesia (Indonesian Woman).
-      ATURAN KONSISTENSI:
-      1. Wajah: "Long straight black hair, soft natural makeup, indonesian features".
-      2. PENTING: Model SEDANG MEMAKAI PRODUK tersebut.
+      MODEL UTAMA: ${lockedFaceDescription}.
+      ${indoBase}
+      VIBE: Sweet, Natural Beauty, Girl Next Door.
     `;
   } else if (config.modelType === 'indo_hijab') {
     rackContent = "hanging modest muslim fashion, tunics, and robes";
+    lockedFaceDescription = "beautiful Indonesian woman, 22 years old, sawo matang skin, wearing modern beige Pashmina Hijab, oval face, gentle dark brown eyes";
     modelInstruction = `
-      MODEL UTAMA: Wanita Indonesia Berhijab (Indonesian Hijabi Woman).
-      ATURAN KONSISTENSI:
-      1. Wajah: "Wearing elegant modern hijab (matching product color), soft natural makeup, indonesian features".
-      2. PENTING: Model SEDANG MEMAKAI PRODUK tersebut dengan gaya sopan/muslimah.
+      MODEL UTAMA: ${lockedFaceDescription}.
+      ${indoBase}
+      VIBE: Anggun, Soft, Muslimah Fashion.
     `;
   } else {
+    // NO MODEL MODE - PRODUCT ONLY
     rackContent = "minimalist aesthetic outfits";
+    lockedFaceDescription = "NO HUMAN, Product Photography only";
     modelInstruction = `
-      MODEL UTAMA: TIDAK ADA MANUSIA (Product Only).
-      Fokus pada produk di hanger atau manekin.
+      MODEL UTAMA: TIDAK ADA MANUSIA (NO HUMANS).
+      FOKUS VISUAL: Product Photography Professional.
+      STYLE SHOT: Kombinasi antara Flatlay (Dari atas), Hanging (Digantung), dan Detail Shot.
+      PENTING: Fokus pada tekstur kain, kerapian jahitan, dan lighting yang aesthetic.
     `;
   }
 
-  // 3. TENTUKAN "FIXED SET DESIGN" UNTUK KONSISTENSI BACKGROUND
-  let fixedBackground = ""; // Ini variabel kunci untuk konsistensi
-  let styleInstruction = "";
+  // 3. BACKGROUND & SCENE STRUCTURE (CONTEXT AWARE)
+  let fixedBackground = ""; 
   let structureInstruction = "";
 
   if (config.styleType === 'cinematic') {
-    // DESKRIPSI BACKGROUND YANG SANGAT SPESIFIK DAN KAKU UNTUK KONSISTENSI
+    // CINEMATIC LOGIC
     fixedBackground = `luxury minimalist studio, pure white cyclorama wall, warm beige concrete floor, large arched standing mirror on left, dried pampas grass in ceramic vase on right, clothing rack with ${rackContent} in background center`;
     
-    styleInstruction = `
-      GAYA VISUAL: AESTHETIC FASHION STUDIO (HIGH END). 
-      Background Wajib (Harus sama persis di semua scene): ${fixedBackground}.
-      Fokus Utama: PRODUK HARUS SAMA PERSIS WARNANYA DENGAN GAMBAR ASLI.
-    `;
-    structureInstruction = `
-      STRUKTUR SCENE (VIRAL STUDIO FORMULA):
-      1. Scene 1 (THE HOOK - Dynamic Entrance): LOW ANGLE.
-         - Visual: Model berjalan masuk ke dalam frame (walking into frame).
-         - Teks Layar (PILIH SATU secara acak): "Jangan Skip! 🛑", "Nemuin Hidden Gem 💎", "Definisi Mewah ✨", "Outfit Sultan 👑", "Racun Fashion 😭"
-      
-      2. Scene 2 (THE PROOF - Detail & Touch): EXTREME CLOSE UP.
-         - Visual: Tangan model menyentuh kain baju. Background agak blur tapi terlihat elemen studio yang sama.
-         - Teks Layar (PILIH SATU secara acak): "Bahannya Adem Pol", "Kualitas Butik", "Tekstur Premium", "Gak Nerawang", "Jahitan Rapi BGT"
+    // Override for Batik in Cinematic
+    if (isBatik) {
+        fixedBackground = "Luxury Indonesian Wedding Hall interior, gold and floral decoration, warm elegant ambiance, carpeted floor";
+    }
 
-      3. Scene 3 (THE CLOSE - Confident & CTA): MEDIUM SHOT.
-         - Visual: Model melihat ke cermin/kamera, tersenyum, menunjuk ke bawah.
-         - Teks Layar (PILIH SATU secara acak): "Stok Dikit, Amankan!", "Cek Keranjang Kuning", "Diskon Hari Ini 👇", "Wajib Punya Fix"
-    `;
+    if (config.modelType === 'no_model') {
+      structureInstruction = `
+        STRUKTUR SCENE (CINEMATIC PRODUCT ONLY):
+        SCENE 1 (THE HOOK - HANGING): Visual: Produk digantung di hanger kayu premium, lighting dramatis (rim light). Background clean studio. Text: "Definisi mewah gak harus mahal ✨".
+        SCENE 2 (THE DETAILS - MACRO): Visual: Extreme Close-up texture kain/kancing/kerah. Tunjukkan kualitas bahan. Text: "Detailnya se-rapi ini dong...".
+        SCENE 3 (THE VIBE - ARTISTIC): Visual: Produk diletakkan estetik di kursi/meja studio dengan majalah/kopi. Text: "Auto check-out sih ini!".
+      `;
+    } else {
+      structureInstruction = `
+        STRUKTUR SCENE (SIMPLE STUDIO VIBE):
+        SCENE 1 (THE LOOK): Visual: Model pose simple di depan cermin. Text: "Outfit ngantor/formal check ✅".
+        SCENE 2 (THE FEEL): Visual: Close up model menyentuh bahan baju. Text: "Bahannya se-adem ini...".
+        SCENE 3 (THE FLEX/PAMER): Visual: Model berjalan percaya diri (Slay walk). Text: "Auto kelihatan jenjang ✨".
+      `;
+    }
+
   } else if (config.styleType === 'unboxing') {
-    fixedBackground = "aesthetic white table, beige wall, soft sunlight from window on right";
-    styleInstruction = `GAYA VISUAL: UNBOXING POV. Background: ${fixedBackground}. Lighting: ${lightingConsistency}.`;
-    structureInstruction = `
-      STRUKTUR SCENE (UNBOXING):
-      1. Scene 1: Buka paket dengan cutter ASMR (Teks Variasi: "Unboxing Time!" / "Paket Datang!").
-      2. Scene 2: Reveal produk dari plastik (Teks Variasi: "Warnanya Cantik BGT" / "Realpict Parah").
-      3. Scene 3: Try-on cepat/Fitting (Teks Variasi: "Link di Bio" / "Cek Keranjang").
-    `;
+    // UNBOXING LOGIC
+    fixedBackground = "Aesthetic bright modern bedroom with white bed sheets, soft morning sunlight, and a large full-length standing mirror in the corner";
+    
+    if (config.modelType === 'no_model') {
+       structureInstruction = `
+        STRUKTUR SCENE (AESTHETIC PRODUCT UNBOXING):
+        SCENE 1 (THE PACKAGE - POV): Visual: POV Tangan membuka paket di atas kasur (White sheets). Box/Plastik terlihat aesthetic. Text: "Iseng checkout, ternyata...".
+        SCENE 2 (THE REVEAL - FLATLAY): Visual: Baju digelar rapi di atas kasur (Flatlay angle from top). Ditata cantik dengan aksesoris. Text: "Aslinya lebih cakep dari foto 😭".
+        SCENE 3 (THE QUALITY - HANGING): Visual: Baju digantung di handle lemari/rack, terkena sinar matahari (Sun kiss). Text: "Fix no debat, 10/10 ⭐".
+      `;
+    } else {
+      structureInstruction = `
+        STRUKTUR SCENE (POV UNBOXING - SEAMLESS FLOW):
+        SCENE 1 (THE PACKAGE - POV HANDS ONLY): Visual: POV Shot tangan membuka paket di atas kasur. Text: "Iseng checkout, ternyata...".
+        SCENE 2 (THE REVEAL - DI DEPAN CERMIN): Visual: CUT ke Model berdiri di depan cermin kamar. Action: Mirror Selfie pose. Text: "Pas dipake se-cakep ini dong 😭".
+        SCENE 3 (THE FLEX / PAMER): Visual: Model yang SAMA, di ruangan yang SAMA. Action: Pose 'Flexing' / Pamer, berputar sedikit. Text: "Fix no debat, 10/10 ⭐".
+      `;
+    }
+
+  } else if (config.styleType === 'outdoor') {
+    // === INDONESIAN OUTDOOR & SMART CONTEXT LOGIC ===
+    
+    if (isRain) {
+        // --- JAS HUJAN / WATERPROOF ---
+        fixedBackground = "Rainy Indonesian street scene (Jalanan aspal basah), blurred motorcycles (motor bebek) parked nearby, grey cloudy sky (mendung), realistic rain atmosphere";
+        
+        if (config.modelType === 'no_model') {
+            structureInstruction = `
+            STRUKTUR SCENE (JAS HUJAN - PRODUCT TEST):
+            SCENE 1 (EXTREME TEST): Visual: Produk diguyur air deras dari selang/ember (Simulasi Hujan Lebat). Air meluncur jatuh (Efek Daun Talas). Text: "Ujan badai? Siapa takut! ⛈️".
+            SCENE 2 (THE PROTECTION): Visual: Close-up bagian sleting yang tertutup seal (Waterproof detail) basah-basahan. Text: "Full seal, air gak bakal rembes".
+            SCENE 3 (COMPACT): Visual: Produk dilipat rapi masuk ke dalam bagasi jok motor. Text: "Praktis, muat di bagasi motor apa aja 🛵".
+            `;
+        } else {
+            structureInstruction = `
+            STRUKTUR SCENE (JAS HUJAN - RIDER EXPERIENCE):
+            SCENE 1 (THE PANIC?): Visual: Langit mendung gelap di pinggir jalan Indonesia. Model buru-buru mengeluarkan jas hujan dari jok motor. Text: "Mendung gak bikin panik 🌧️".
+            SCENE 2 (THE PROOF): Visual: Model memakai jas hujan, berdiri di bawah hujan atau disemprot air. Badan tetap kering, air lewat doang. Text: "Anti rembes, baju dalem aman!".
+            SCENE 3 (THE RIDE): Visual: Model duduk di atas motor, siap gas, memberi jempol ke kamera. Text: "Gas terus, bikers wajib punya! 🛵".
+            `;
+        }
+    
+    } else if (isBatik) {
+        // --- BATIK / FORMAL ---
+        fixedBackground = "Outdoor Indonesian Garden Party wedding venue, green grass, janur kuning decoration in background, warm golden hour lighting";
+        
+        if (config.modelType === 'no_model') {
+            structureInstruction = `
+            STRUKTUR SCENE (BATIK - PRODUCT DISPLAY):
+            SCENE 1 (THE VIBE): Visual: Kain/Baju batik digantung estetik dengan background dekorasi pesta kebun. Text: "Mewah buat kondangan ✨".
+            SCENE 2 (THE PATTERN): Visual: Macro shot motif batik dan tekstur kain yang premium/halus. Text: "Motifnya mahal banget".
+            SCENE 3 (THE OUTFIT): Visual: Flatlay batik dipadukan dengan aksesoris kondangan (tas/sepatu). Text: "Siap jadi pusat perhatian".
+            `;
+        } else {
+            structureInstruction = `
+            STRUKTUR SCENE (BATIK - KONDANGAN VIBE):
+            SCENE 1 (THE ARRIVAL): Visual: Model berjalan anggun memasuki area pesta kebun (Garden Party). Text: "OOTD Kondangan check ✅".
+            SCENE 2 (THE CONFIDENCE): Visual: Pose candid, model merapikan kerah/lengan, tersenyum elegan. Text: "Berasa pakai baju jutaan 😭".
+            SCENE 3 (SOCIAL): Visual: Model menyapa tamu lain (blurred), terlihat percaya diri dan santun. Text: "Auto dipuji camer nih!".
+            `;
+        }
+
+    } else if (isOutdoorGear) {
+        // --- OUTDOOR / HIKING ---
+        fixedBackground = "Indonesian Pine Forest (Hutan Pinus) hiking trail, tropical nature, dirt path, misty morning light";
+        
+        if (config.modelType === 'no_model') {
+            structureInstruction = `
+            STRUKTUR SCENE (OUTDOOR GEAR - TOUGHNESS):
+            SCENE 1 (NATURE): Visual: Produk diletakkan di atas batu berlumut atau dahan pohon di hutan pinus. Text: "Teman setia petualangan 🌲".
+            SCENE 2 (DURABILITY): Visual: Detail bahan yang tebal/kuat, mungkin sedikit kotor terkena tanah (Rugged look). Text: "Bahannya badak, super awet!".
+            SCENE 3 (READY): Visual: Produk digantung di tenda camping atau tas carrier. Text: "Anak gunung wajib punya".
+            `;
+        } else {
+            structureInstruction = `
+            STRUKTUR SCENE (OUTDOOR GEAR - ADVENTURE):
+            SCENE 1 (EXPLORE): Visual: Model hiking menanjak di jalur hutan pinus. Text: "Healing ke alam tetap stylish 🏔️".
+            SCENE 2 (REST): Visual: Model istirahat duduk di batang kayu, menikmati suasana alam. Text: "Nyaman dipakai seharian, gak gerah".
+            SCENE 3 (FREEDOM): Visual: Model berdiri di tebing/puncak, merentangkan tangan menikmati angin. Text: "Best investment buat traveling!".
+            `;
+        }
+
+    } else {
+        // --- GENERAL INDONESIAN STREET STYLE ---
+        fixedBackground = "Indonesian sidewalk (trotoar) with paving blocks, tropical trees, angkringan or motorcycles (motor bebek) in blurred background, bright daylight";
+        
+        if (config.modelType === 'no_model') {
+            structureInstruction = `
+            STRUKTUR SCENE (STREET STYLE - PRODUCT):
+            SCENE 1 (CITY VIBE): Visual: Produk diletakkan di bangku taman kota atau pagar estetik pinggir jalan. Text: "Vibe-nya mahal banget ✨".
+            SCENE 2 (SUN KISS): Visual: Close up tekstur dengan lighting matahari natural (Sun kiss). Text: "Detailnya juara!".
+            SCENE 3 (DAILY): Visual: Produk dibawa/digantung dengan background keramaian kota (Blur). Text: "Cocok buat daily activity kamu".
+            `;
+        } else {
+            structureInstruction = `
+            STRUKTUR SCENE (STREET STYLE - LIFESTYLE):
+            SCENE 1 (CITY WALK): Visual: Model berjalan santai di trotoar kota (City walk). Background motor lewat blur. Text: "Outfit jalan-jalan sore check ✅".
+            SCENE 2 (CANDID): Visual: Model menyeberang jalan atau stop di pinggir jalan, candid shot. Text: "Nyaman dipake seharian, gak gerah".
+            SCENE 3 (POSE): Visual: Model pose fierce di depan tembok estetik/cafe jalanan. Text: "Fix, bakal sering dipake sih ini!".
+            `;
+        }
+    }
+
   } else {
-    // Natural / UGC
-    fixedBackground = "tidy modern bedroom, white bed sheets, small plant on nightstand, soft warm lamp";
-    styleInstruction = `
-      GAYA VISUAL: HOME REVIEW (UGC). Background: ${fixedBackground}. Lighting: ${lightingConsistency}.
-    `;
+    // NATURAL / UGC DEFAULT
+    fixedBackground = "tidy modern bedroom with wardrobe, white bed sheets, small plant on nightstand, soft warm lamp";
     structureInstruction = `
-      STRUKTUR SCENE (UGC FLOW):
-      1. SCENE 1: Model duduk santai curhat soal baju (Teks Variasi: "Jujurly Bagus Banget" / "Baju ternyaman!").
-      2. SCENE 2: Berdiri pamer full body (Teks Variasi: "Cuttingan Juara" / "Bikin Langsing").
-      3. SCENE 3: Ajak kembaran (Teks Variasi: "Buruan Checkout" / "Samaan Yuk").
+      STRUKTUR SCENE (SIMPLE DAILY LIFE):
+      SCENE 1 (THE DILEMMA): Visual: Model di depan lemari, bingung. Text: "Baju andalan kalau buru-buru".
+      SCENE 2 (THE SOLUTION): Visual: Model ambil produk ini dengan happy. Text: "Sat set langsung rapi ✨".
+      SCENE 3 (THE FLEX / READY): Visual: Model sudah pakai, twirl, siap pergi. Text: "Siap berangkat! 👋".
     `;
+    if (config.modelType === 'no_model') {
+        structureInstruction = `
+        STRUKTUR SCENE (DAILY AESTHETIC - PRODUCT ONLY):
+        SCENE 1 (THE MOOD - FLATLAY): Visual: Baju ditaruh di kasur (Messy but aesthetic), sebelah laptop/buku. Text: "Save dulu buat inspirasi ✨".
+        SCENE 2 (THE DETAILS): Visual: Tangan (Close up) memegang bahan kain. Text: "Bahannya lembut banget".
+        SCENE 3 (THE READY - HANGING): Visual: Baju digantung di pintu lemari. Text: "Wajib punya minimal satu!".
+        `;
+    }
   }
 
   const productNameContext = config.productName 
@@ -175,48 +298,41 @@ export const generateManualPromptText = (config: CampaignConfig): string => {
     : `NAMA PRODUK: Analisis dari gambar yang saya upload.`;
 
   return `
-Role: Anda adalah Affiliate Video Director (Kling AI Expert).
-Tugas: Buat prompt video yang menjaga KONSISTENSI PRODUK, KONSISTENSI BACKGROUND, dan MENGGUNAKAN TEKS BAHASA INDONESIA.
+Role: Anda adalah Creative Director TikTok Indonesia.
 
-KONTEKS:
+KONTEKS PRODUK:
 ${productNameContext}
+Kategori Visual: ${isRain ? 'PERLENGKAPAN HUJAN/WATERPROOF' : isBatik ? 'FASHION FORMAL/TRADISIONAL' : isOutdoorGear ? 'OUTDOOR/NATURE' : 'CASUAL/GENERAL'}
+Harga: ${config.productPrice || '(Rahasia/Terjangkau)'}
+
+INSTRUKSI NASKAH & VISUAL (PENTING):
+1. **LOCAL VIBE**: Gunakan background "${fixedBackground}". Pastikan terasa seperti di Indonesia (Trotoar paving, motor bebek, hutan pinus, atau pesta kebun).
+2. **RELEVANSI NASKAH**: 
+   - Jika Jas Hujan -> Script harus tentang "Anti Basah", "Aman naik motor", "Hujan". JANGAN bilang "cocok buat hangout".
+   - Jika Batik -> Script harus tentang "Kondangan", "Resmi", "Elegan".
+   - Jika Outdoor -> Script harus tentang "Petualangan", "Kuat", "Alam".
+3. **KONSISTENSI VISUAL MUTLAK**: 
+   - Anda WAJIB menggunakan deskripsi fisik berikut di SETIAP prompt (Image & Video) tanpa perubahan: "${lockedFaceDescription}".
+   - Prompt Video (Kling AI) HARUS MEMUAT deskripsi fisik yang 100% SAMA PERSIS dengan prompt gambar. Jangan diringkas.
+
 ${modelInstruction}
-${styleInstruction}
+
 ${structureInstruction}
 
-ATURAN GENERASI:
-1. **FORMAT VIDEO (MUTLAK)**: Setiap 'kling_video_prompt' WAJIB diawali dengan teks: "Vertical video 9:16,".
-2. **KONSISTENSI BACKGROUND (CRITICAL)**: Anda WAJIB menyertakan frasa berikut di SETIAP 'image_prompt' dan 'kling_video_prompt' untuk menjaga konsistensi tempat: "${fixedBackground}". Jangan ubah deskripsi background antar scene.
-3. **BAHASA INDONESIA**: Output 'cta_text' HARUS Bahasa Indonesia gaul/marketing.
-4. **DETAIL PRODUK**: Deskripsikan warna dan motif baju secara eksplisit.
-5. **VARIASI TEKS**: Pilih kata-kata marketing yang berbeda-beda setiap kali generate.
-
-STRUKTUR OUTPUT (JSON MURNI):
+STRUKTUR OUTPUT JSON:
 {
-  "product_name": "Nama Produk",
-  "social_media_caption": "Outfit hack biar kelihatan tinggi! 😍 Bahannya adem pol, fix wajib punya buat daily wear. Cek keranjang kuning sekarang! #racunshopee #ootdhijab #fyp",
+  "product_name": "...",
+  "social_media_caption": "...",
+  "voiceover_script": "...",
   "scenes": [
     {
-      "scene_title": "Scene 1: The Hook",
-      "angle_description": "Low Angle / Dynamic Entrance",
-      "image_prompt": "Vertical portrait 9:16, low angle shot of Indonesian model wearing [INSERT DETAILED PRODUCT DESCRIPTION HERE], looking confident, walking pose, ${fixedBackground}, 8k, photorealistic",
-      "kling_video_prompt": "Vertical video 9:16, low angle, model wearing [INSERT DETAILED PRODUCT DESCRIPTION HERE] walking confidently into frame towards camera, ${fixedBackground}, ${lightingConsistency}",
-      "cta_text": "Definisi Elegan ✨"
+      "scene_title": "...",
+      "angle_description": "...",
+      "image_prompt": "Vertical portrait 9:16, [Action], ${lockedFaceDescription}, [Detailed Outfit Description], [BACKGROUND DARI INSTRUKSI DI ATAS] (NO TEXT IN IMAGE, CLEAN NO WATERMARK)...",
+      "kling_video_prompt": "Vertical video 9:16, [Action], ${lockedFaceDescription} (FULL DESCRIPTION - DO NOT SHORTEN), [Detailed Outfit Description - SAME AS SCENE 2], [BACKGROUND DARI INSTRUKSI DI ATAS], Silent video, no talking, no audio...",
+      "cta_text": "..."
     },
-    {
-      "scene_title": "Scene 2: Quality Proof",
-      "angle_description": "Extreme Close Up (Hand Interaction)",
-      "image_prompt": "Vertical portrait 9:16, extreme close up of [INSERT DETAILED PRODUCT DESCRIPTION HERE] fabric texture, model's hand touching the material gently, soft lighting, ${fixedBackground} (slightly blurred), high detail",
-      "kling_video_prompt": "Vertical video 9:16, extreme close up, hand gently brushing against the fabric of [INSERT DETAILED PRODUCT DESCRIPTION HERE] to show softness, slow motion, ${fixedBackground} (blurred background), ${lightingConsistency}",
-      "cta_text": "Bahannya Premium Parah 😭"
-    },
-    {
-      "scene_title": "Scene 3: The Call",
-      "angle_description": "Medium Shot (Mirror/Final Pose)",
-      "image_prompt": "Vertical portrait 9:16, medium shot of Indonesian model wearing [INSERT DETAILED PRODUCT DESCRIPTION HERE], looking at camera with satisfied smile, hand pointing down, ${fixedBackground}",
-      "kling_video_prompt": "Vertical video 9:16, medium shot, model wearing [INSERT DETAILED PRODUCT DESCRIPTION HERE] checking appearance in mirror then turning to smile at camera and pointing down, ${fixedBackground}, ${lightingConsistency}",
-      "cta_text": "Stok Dikit, Amankan! 👇"
-    }
+    ...
   ]
 }
   `.trim();
@@ -233,18 +349,21 @@ export const generateAffiliatePrompts = async (
   const ai = new GoogleGenAI({ apiKey });
   const modelId = "gemini-2.5-flash"; 
 
+  // Generate Prompt Text using the new Logic
+  const manualPrompt = generateManualPromptText(config);
+
   const systemInstruction = `
-    Anda adalah Director Video AI Profesional khusus pasar Indonesia.
+    Anda adalah Pakar Konten TikTok Organik Indonesia.
     
-    CRITICAL INSTRUCTION:
-    1. **ANALISIS VISUAL**: Lihat warna baju, motif, dan bentuk kerah dengan sangat teliti. JANGAN UBAH WARNA.
-    2. **FORMAT VIDEO**: Wajib PORTRAIT / VERTICAL. Semua prompt video harus diawali "Vertical video 9:16,".
-    3. **BACKGROUND KONSISTEN**: Gunakan deskripsi background yang SAMA PERSIS untuk ketiga scene (White cyclorama, beige floor, etc) sesuai konfigurasi.
-    4. **BAHASA**: Output 'cta_text' HARUS Bahasa Indonesia gaul/marketing (pendek, padat, jelas).
-    5. **STRUKTUR**: Ikuti struktur "Viral Studio Formula" (Hook -> Proof -> CTA).
-    6. **VARIASI**: Gunakan variasi naskah yang berbeda-beda untuk cta_text agar tidak monoton.
+    TUGAS: Generate JSON konten video berdasarkan gambar produk yang diupload.
     
-    ${generateManualPromptText(config)}
+    RULES UTAMA:
+    1. Ikuti struktur scene dan background yang sudah didefinisikan secara spesifik di bawah ini.
+    2. Pastikan Script Voiceover dan Text Overlay SESUAI dengan fungsi barang (Misal: Jas hujan untuk hujan, Batik untuk pesta).
+    3. Konsistensi Visual adalah kunci.
+    4. IMAGE PROMPT: Do not request text inside the image. Explicitly mention 'clean image, no watermarks'.
+    
+    ${manualPrompt}
   `;
 
   const response = await retryWithBackoff<GenerateContentResponse>(() => ai.models.generateContent({
@@ -256,7 +375,8 @@ export const generateAffiliatePrompts = async (
         type: Type.OBJECT,
         properties: {
           product_name: { type: Type.STRING },
-          social_media_caption: { type: Type.STRING },
+          social_media_caption: { type: Type.STRING, description: "Caption TikTok soft selling, relevan dengan fungsi produk." },
+          voiceover_script: { type: Type.STRING, description: "Narasi pendek (10-15s) yang persuasif sesuai fungsi produk." },
           scenes: {
             type: Type.ARRAY,
             items: {
@@ -264,21 +384,21 @@ export const generateAffiliatePrompts = async (
               properties: {
                 scene_title: { type: Type.STRING },
                 angle_description: { type: Type.STRING },
-                image_prompt: { type: Type.STRING },
-                kling_video_prompt: { type: Type.STRING },
+                image_prompt: { type: Type.STRING, description: "Prompt gambar. WAJIB: [DESKRIPSI WAJAH SPESIFIK] + [DESKRIPSI BAJU KONSISTEN] + [BACKGROUND SESUAI KONTEKS]. NO TEXT. NO WATERMARK." },
+                kling_video_prompt: { type: Type.STRING, description: "Prompt video AI. WAJIB: [DESKRIPSI WAJAH SPESIFIK SAMA PERSIS DENGAN IMAGE PROMPT] + [DESKRIPSI BAJU SAMA PERSIS] + [BACKGROUND SESUAI KONTEKS], 'Silent video'." },
                 cta_text: { type: Type.STRING }
               },
               required: ["scene_title", "angle_description", "image_prompt", "kling_video_prompt", "cta_text"]
             }
           }
         },
-        required: ["product_name", "social_media_caption", "scenes"]
+        required: ["product_name", "social_media_caption", "voiceover_script", "scenes"]
       }
     },
     contents: {
       parts: [
         { inlineData: { mimeType: mimeType, data: imageBase64 } },
-        { text: "Generate JSON campaign. Analyze product color carefully. Create viral caption." }
+        { text: `Generate TikTok Content for product: ${config.productName}. Price: ${config.productPrice}. Style: ${config.styleType}. Model: ${config.modelType}. DETECT PRODUCT CONTEXT (Rain/Batik/Outdoor) AND ADJUST SCRIPT/BACKGROUND ACCORDINGLY.` }
       ]
     }
   }));
@@ -289,30 +409,23 @@ export const generateAffiliatePrompts = async (
 
 export const generateImageFromPrompt = async (
     prompt: string, 
-    referenceImageBase64?: string,
-    quality: ImageQuality = 'standard'
+    referenceImageBase64?: string
 ): Promise<string> => {
   const apiKey = getApiKey();
   if (!apiKey) throw new Error("API Key missing");
 
   const ai = new GoogleGenAI({ apiKey });
   
-  const modelId = quality === 'premium' 
-    ? "gemini-3-pro-image-preview" 
-    : "gemini-2.5-flash-image";
+  // FORCE GEMINI 2.5 FLASH IMAGE FOR COST SAVINGS
+  const modelId = "gemini-2.5-flash-image"; 
 
-  console.log(`Generating image using ${modelId} (${quality} mode)`);
+  console.log(`Generating image using ${modelId} (Flash mode)`);
 
   const parts: any[] = [];
   
-  let visualStyle = "";
-  if (quality === 'premium') {
-    visualStyle = "Fashion photography, 8k resolution, photorealistic. Background: blurred minimalist white studio with specific clothing rack. Subject:";
-  } else {
-    visualStyle = "Realistic product photo. Background: bright clean studio. Subject:";
-  }
+  const visualStyle = "High-quality realistic photography, 4k, professional lighting. Background: clean and aesthetic. Subject:";
   
-  const constraint = "IMPORTANT: The product worn/shown MUST match the reference image exactly in COLOR, PATTERN, and DESIGN. Do not change the product color.";
+  const constraint = "IMPORTANT: The product worn/shown MUST match the reference image exactly in COLOR, PATTERN, and DESIGN. STRICT RULE: DO NOT use the face from the reference image. You MUST generate a BRAND NEW, unique Native Indonesian model face (Sawo matang skin) that looks different from the reference. EXTREMELY IMPORTANT: IGNORE and REMOVE any text, watermarks, or logos found in the reference image. The generated image must be completely CLEAN, high-quality photography with NO WATERMARKS and NO TEXT.";
   
   const finalPrompt = `${visualStyle} ${prompt}. ${constraint}`;
 
@@ -323,9 +436,7 @@ export const generateImageFromPrompt = async (
     parts.push({ text: finalPrompt });
   }
 
-  const imageConfig = quality === 'premium' 
-    ? { aspectRatio: "9:16", imageSize: "1K" }
-    : { aspectRatio: "9:16" };
+  const imageConfig = { aspectRatio: "9:16" };
 
   const response = await retryWithBackoff<GenerateContentResponse>(() => ai.models.generateContent({
     model: modelId,

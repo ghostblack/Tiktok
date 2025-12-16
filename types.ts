@@ -10,6 +10,7 @@ export interface ScenePrompt {
 export interface GeneratedCampaign {
   product_name: string;
   social_media_caption: string; // New field for viral hashtags/caption
+  voiceover_script: string; // New field for audio narration
   scenes: ScenePrompt[];
 }
 
@@ -21,12 +22,11 @@ export enum ProcessStatus {
 }
 
 export type ModelType = 'indo_man' | 'indo_woman' | 'indo_hijab' | 'no_model';
-export type StyleType = 'cinematic' | 'natural' | 'unboxing';
-export type ImageQuality = 'standard' | 'premium';
+export type StyleType = 'cinematic' | 'natural' | 'unboxing' | 'outdoor';
 
 export interface CampaignConfig {
   modelType: ModelType;
   styleType: StyleType;
   productName: string;
-  imageQuality: ImageQuality;
+  productPrice: string; // New input for price
 }

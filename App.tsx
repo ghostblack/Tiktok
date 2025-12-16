@@ -1,7 +1,8 @@
+
 import React, { useState, useRef, useEffect } from 'react';
-import { UploadIcon, ManIcon, WomanIcon, HijabIcon, BoxIcon, CameraIcon, PhoneIcon, CopyIcon, CheckIcon } from './components/Icon';
+import { UploadIcon, ManIcon, WomanIcon, HijabIcon, BoxIcon, CameraIcon, PhoneIcon, CopyIcon, CheckIcon, SpeakerIcon } from './components/Icon';
 import { generateAffiliatePrompts, generateManualPromptText } from './services/geminiService';
-import { GeneratedCampaign, ProcessStatus, ModelType, StyleType, CampaignConfig, ImageQuality } from './types';
+import { GeneratedCampaign, ProcessStatus, ModelType, StyleType, CampaignConfig } from './types';
 import { SceneCard } from './components/SceneCard';
 import { CopyButton } from './components/CopyButton';
 
@@ -16,9 +17,9 @@ const App: React.FC = () => {
   
   // Configuration State
   const [productName, setProductName] = useState<string>("");
+  const [productPrice, setProductPrice] = useState<string>(""); // New State
   const [modelType, setModelType] = useState<ModelType>('indo_woman');
   const [styleType, setStyleType] = useState<StyleType>('natural');
-  const [imageQuality, setImageQuality] = useState<ImageQuality>('standard');
   
   // Manual Mode State
   const [isManualMode, setIsManualMode] = useState(false);
@@ -118,7 +119,7 @@ const App: React.FC = () => {
     setErrorMsg("");
 
     try {
-      const config: CampaignConfig = { modelType, styleType, productName, imageQuality };
+      const config: CampaignConfig = { modelType, styleType, productName, productPrice };
       const campaign = await generateAffiliatePrompts(uploadedImageBase64, file.type, config);
       setResult(campaign);
       setStatus(ProcessStatus.SUCCESS);
@@ -131,7 +132,7 @@ const App: React.FC = () => {
 
   // MANUAL MODE HELPERS
   const getManualPrompt = () => {
-    const config: CampaignConfig = { modelType, styleType, productName, imageQuality };
+    const config: CampaignConfig = { modelType, styleType, productName, productPrice };
     return generateManualPromptText(config);
   };
 
@@ -196,7 +197,7 @@ const App: React.FC = () => {
             </div>
             <div>
               <h1 className="font-bold text-lg leading-tight">Affiliate Director</h1>
-              <p className="text-xs text-slate-400">Gemini 2.5 & Kling AI Workflow</p>
+              <p className="text-xs text-slate-400">Gemini 2.5 Flash Edition</p>
             </div>
           </div>
           
@@ -292,15 +293,27 @@ const App: React.FC = () => {
                 </h2>
                 
                 <div className="space-y-6">
-                  <div>
-                    <label className="block text-sm font-medium text-slate-300 mb-2">Nama Produk</label>
-                    <input 
-                      type="text" 
-                      value={productName}
-                      onChange={(e) => setProductName(e.target.value)}
-                      placeholder="Contoh: Sepatu Lari Nike Pegasus"
-                      className="w-full bg-slate-800/50 border border-slate-700 rounded-xl px-4 py-3 text-slate-200 placeholder-slate-500 focus:outline-none focus:border-purple-500 transition-all"
-                    />
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-slate-300 mb-2">Nama Produk</label>
+                      <input 
+                        type="text" 
+                        value={productName}
+                        onChange={(e) => setProductName(e.target.value)}
+                        placeholder="Contoh: Jas Hujan, Batik"
+                        className="w-full bg-slate-800/50 border border-slate-700 rounded-xl px-4 py-3 text-slate-200 placeholder-slate-500 focus:outline-none focus:border-purple-500 transition-all"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-slate-300 mb-2">Harga (Untuk Narasi)</label>
+                      <input 
+                        type="text" 
+                        value={productPrice}
+                        onChange={(e) => setProductPrice(e.target.value)}
+                        placeholder="Cth: Rp 100 Ribuan"
+                        className="w-full bg-slate-800/50 border border-slate-700 rounded-xl px-4 py-3 text-slate-200 placeholder-slate-500 focus:outline-none focus:border-purple-500 transition-all"
+                      />
+                    </div>
                   </div>
 
                   <div>
@@ -313,30 +326,18 @@ const App: React.FC = () => {
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-sm font-medium text-slate-300 mb-2">Gaya Visual</label>
-                        <select 
-                            value={styleType}
-                            onChange={(e) => setStyleType(e.target.value as StyleType)}
-                            className="w-full bg-slate-800/50 border border-slate-700 rounded-xl px-4 py-3 text-slate-200 focus:outline-none focus:border-blue-500"
-                        >
-                            <option value="natural">Casual Home (UGC)</option>
-                            <option value="cinematic">Clean Studio (Pro)</option>
-                            <option value="unboxing">Unboxing & Promo (Viral)</option>
-                        </select>
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-slate-300 mb-2">Kualitas Gambar</label>
-                        <select 
-                            value={imageQuality}
-                            onChange={(e) => setImageQuality(e.target.value as ImageQuality)}
-                            className="w-full bg-slate-800/50 border border-slate-700 rounded-xl px-4 py-3 text-slate-200 focus:outline-none focus:border-green-500"
-                        >
-                            <option value="standard">Standard (Hemat/Cepat)</option>
-                            <option value="premium">Premium (Pro 3.0)</option>
-                        </select>
-                      </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-300 mb-2">Gaya Visual</label>
+                    <select 
+                        value={styleType}
+                        onChange={(e) => setStyleType(e.target.value as StyleType)}
+                        className="w-full bg-slate-800/50 border border-slate-700 rounded-xl px-4 py-3 text-slate-200 focus:outline-none focus:border-blue-500"
+                    >
+                        <option value="natural">Casual Home (UGC)</option>
+                        <option value="cinematic">Clean Studio (Pro)</option>
+                        <option value="unboxing">Unboxing & Promo (Viral)</option>
+                        <option value="outdoor">Outdoor / Street Style</option>
+                    </select>
                   </div>
                 </div>
               </div>
@@ -362,7 +363,7 @@ const App: React.FC = () => {
                         Sedang Menganalisis...
                       </div>
                     ) : (
-                      `Generate Prompt (${imageQuality === 'premium' ? 'Pro' : 'Std'})`
+                      `Generate Prompt`
                     )}
                   </button>
                 ) : (
@@ -425,39 +426,55 @@ const App: React.FC = () => {
               <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-800/50 pb-6">
                 <div>
                   <h2 className="text-3xl font-bold text-white mb-2">{result.product_name}</h2>
-                  <p className="text-slate-400">Campaign generated via {isManualMode ? 'Manual Input' : 'Gemini API'}.</p>
+                  <p className="text-slate-400">Campaign generated via {isManualMode ? 'Manual Input' : 'Gemini 2.5 Flash'}.</p>
                 </div>
                 <div className="flex gap-2">
                    <span className="text-sm bg-slate-800 text-slate-300 px-4 py-2 rounded-full border border-slate-700 flex items-center gap-2">
                     {modelType === 'indo_woman' ? <WomanIcon /> : modelType === 'indo_man' ? <ManIcon /> : modelType === 'indo_hijab' ? <HijabIcon /> : <BoxIcon />}
                     {modelType === 'indo_woman' ? 'Cewek Indo' : modelType === 'indo_man' ? 'Cowok Indo' : modelType === 'indo_hijab' ? 'Cewek Hijab' : 'Produk Only'}
                   </span>
-                   <span className={`text-sm px-4 py-2 rounded-full border flex items-center gap-2 ${imageQuality === 'premium' ? 'bg-purple-900/30 border-purple-500 text-purple-300' : 'bg-green-900/30 border-green-500 text-green-300'}`}>
-                    {imageQuality === 'premium' ? '💎 Premium Mode' : '⚡ Standard Mode'}
-                  </span>
                 </div>
               </div>
 
-               {/* VIRAL CAPTION BOX */}
-               {result.social_media_caption && (
-                <div className="bg-gradient-to-r from-pink-900/30 to-purple-900/30 border border-pink-500/30 rounded-xl p-6 relative">
-                  <div className="flex items-center justify-between mb-3">
-                    <h3 className="text-pink-300 font-bold flex items-center gap-2">
-                       <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-5.2 1.74 2.89 2.89 0 0 1 2.31-4.64 2.93 2.93 0 0 1 .88.13V9.4a6.84 6.84 0 0 0-1-.05A6.33 6.33 0 0 0 5 20.1a6.34 6.34 0 0 0 10.86-4.43v-7a8.16 8.16 0 0 0 4.77 1.52v-3.4a4.85 4.85 0 0 1-1-.1z"/></svg>
-                       Viral TikTok/Shopee Caption
-                    </h3>
-                    <CopyButton text={result.social_media_caption} label="Copy Caption" />
+              {/* TWO COLUMNS FOR TEXT ASSETS: VOICEOVER & CAPTION */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                 
+                 {/* VOICEOVER BOX (NEW) */}
+                 {result.voiceover_script && (
+                    <div className="bg-gradient-to-r from-orange-900/30 to-amber-900/30 border border-orange-500/30 rounded-xl p-6 relative">
+                      <div className="flex items-center justify-between mb-3">
+                        <h3 className="text-orange-300 font-bold flex items-center gap-2">
+                           <SpeakerIcon />
+                           Narasi / Voiceover (15-30s)
+                        </h3>
+                        <CopyButton text={result.voiceover_script} label="Copy Script" />
+                      </div>
+                      <div className="bg-slate-950/50 p-4 rounded-lg border border-slate-700/50">
+                        <p className="text-slate-200 font-medium leading-relaxed italic">
+                          "{result.voiceover_script}"
+                        </p>
+                      </div>
+                    </div>
+                 )}
+
+                 {/* VIRAL CAPTION BOX */}
+                 {result.social_media_caption && (
+                  <div className="bg-gradient-to-r from-pink-900/30 to-purple-900/30 border border-pink-500/30 rounded-xl p-6 relative">
+                    <div className="flex items-center justify-between mb-3">
+                      <h3 className="text-pink-300 font-bold flex items-center gap-2">
+                         <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-5.2 1.74 2.89 2.89 0 0 1 2.31-4.64 2.93 2.93 0 0 1 .88.13V9.4a6.84 6.84 0 0 0-1-.05A6.33 6.33 0 0 0 5 20.1a6.34 6.34 0 0 0 10.86-4.43v-7a8.16 8.16 0 0 0 4.77 1.52v-3.4a4.85 4.85 0 0 1-1-.1z"/></svg>
+                         Viral Caption
+                      </h3>
+                      <CopyButton text={result.social_media_caption} label="Copy Caption" />
+                    </div>
+                    <div className="bg-slate-950/50 p-4 rounded-lg border border-slate-700/50 h-full max-h-[160px] overflow-y-auto">
+                      <p className="text-slate-200 font-medium leading-relaxed">
+                        {result.social_media_caption}
+                      </p>
+                    </div>
                   </div>
-                  <div className="bg-slate-950/50 p-4 rounded-lg border border-slate-700/50">
-                    <p className="text-slate-200 font-medium leading-relaxed">
-                      {result.social_media_caption}
-                    </p>
-                    <p className="text-right text-xs text-slate-500 mt-2">
-                       {result.social_media_caption.length} / 150 chars
-                    </p>
-                  </div>
-                </div>
-              )}
+                )}
+              </div>
               
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {result.scenes.map((scene, index) => (
@@ -466,7 +483,6 @@ const App: React.FC = () => {
                       scene={scene} 
                       index={index} 
                       uploadedImageBase64={uploadedImageBase64 || undefined}
-                      imageQuality={imageQuality}
                   />
                 ))}
               </div>
